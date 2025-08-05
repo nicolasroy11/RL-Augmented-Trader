@@ -8,7 +8,7 @@ class OrderSide:
     SELL = Client.SIDE_SELL
 
 
-class OrderType:
+class OrderType: 
     MARKET = Client.ORDER_TYPE_MARKET
     LIMIT = Client.ORDER_TYPE_LIMIT
 

@@ -2,6 +2,14 @@
 ## A real-time, deep reinforcement learning trading bot that uses live Binance 5-second tick data, technical indicators, and a custom PyTorch policy gradient agent to make buy/hold/sell decisions. The environment simulates live market PnL and is built from scratch without high-level libraries like Stable-Baselines.
 
 
+## Why This Project?
+
+This project is part of my portfolio to demonstrate end-to-end applied machine learning in a financial context. It blends low-latency data pipelines, reinforcement learning, and custom environments — similar to what you'd see in hedge fund research platforms.
+
+Contact: nicolasroy11@gmail.com
+
+
+
 ## Features
 
 ✅ Real-time 5s data ingestion from Binance  
@@ -42,3 +50,51 @@ The concept is rather simple: take in a time window of recent market observation
 The db folder contains a module that strictly concerns itself with the scraping, storing, and visualization of raw data. Since the nature of volatile assets presents tiny opportunities to profitably buy and sell at any moment regardless of wider trend, I opted to walk away from querying trading platform APIs for minutely OHLV data, favoring the storage sub-minute instantaneous tick and technical indicator (RSI, MACD, EMA in various lengths,) exactly as they would appear in a live scenario. A quick snapshot of current conditions. The interval is adjustable, and the default is 5-second intervals.
 
 The RL folder houses the logic that will produce our model. In a bid to decouple this approach from my own trading biases and observations, I opted to start the exploration off with a purely stochastic run. Just collect a large amount of ticks and indicators and let the simplest feed-forward network buy and sell at random while keeping track of reward and PnL states. From observing the output vector change in real time as the network works through the data, it is visually evident that converging values are reached, confirming the model's confidence in its increasing experience.
+
+
+## 🚀 Getting Started 🚀
+
+### 1. Clone the repo
+```bash
+git clone https://github.com/nicolasroy11/RL-Augmented-Trader.git
+cd RL-Augmented-Trader
+```
+
+### Navigate Into The Repo
+```bash
+cd RL-Augmented-Trader
+```
+
+### Install The Requirements
+```bash
+pip install -r requirements.txt
+```
+
+### Run The Data Storage For Any Desired Amount Of Time
+before the step , you may need to set the python path using
+```bash
+export PYTHONPATH=.
+```
+```bash
+python db/datastore.py
+```
+
+### Once you have completed the above step, you can run a quick visualization of what you've collected
+```bash
+python db/visualization.py
+```
+
+### To run the stochastic training experiment, use the following command:
+```bash
+python RL/playground/stochastic/run.py
+```
+
+
+## Roadmap / TODO
+
+- [ ] Integrate PPO agent for more stable learning
+- [ ] Add Sharpe ratio evaluations and other standard performance markers
+- [ ] Improve model performance tracking with additional tooling
+- [ ] Publish blog write-up on training insights
+- [ ] Once a successful model is generated, integrate it into the existing Lowrider code
+- [ ] Broadcast buy/sell signals on Zignaly for consumption by third party traders

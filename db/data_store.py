@@ -3,7 +3,6 @@ from binance.client import Client
 import duckdb
 from datetime import datetime, timezone
 import time
-import runtime_settings
 import pandas_ta as ta
 from helpers import connection_is_good, get_latest_candles
 import os

@@ -1,14 +1,12 @@
-import duckdb
 import finplot as fplt
 import pandas as pd
-import os
-from db.data_store import db_path
 
-# --- Connect to your ticks.duckdb file ---
-con = duckdb.connect(db_path, read_only=True)
+from db.data_store import DataStore
+from db.settings import DB_FILE_PATH
+
 
 # Fetch the data
-df = con.execute("SELECT * FROM ticks ORDER BY timestamp ASC").fetchdf()
+df = DataStore(DB_FILE_PATH, readonly=True).get_all_tick_data()
 df['timestamp'] = pd.to_datetime(df['timestamp'])
 df.set_index('timestamp', inplace=True)
 

@@ -4,15 +4,14 @@ import duckdb
 from datetime import datetime, timezone
 import time
 import pandas_ta as ta
+from db.settings import DB_FILE_PATH, SYMBOL
 from helpers import connection_is_good, get_latest_candles
 import os
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-db_path = os.path.join(script_dir, "ticks.duckdb")
-con = duckdb.connect(db_path)
+
+con = duckdb.connect(DB_FILE_PATH)
 
 client = Client(tld='com')
-symbol = 'BTCFDUSD'
 store_frequency_secs = 5
 
 
@@ -93,9 +92,9 @@ def get_tick_data() -> Tick:
     mid_rsi_length = 7
     long_rsi_length = 12
     ts = datetime.now(timezone.utc)
-    ticker = client.get_symbol_ticker(symbol=symbol)
+    ticker = client.get_symbol_ticker(symbol=SYMBOL)
     price = float(ticker['price'])
-    data = get_latest_candles(client, symbol, xlong_ema_length * 50, client.KLINE_INTERVAL_1MINUTE)
+    data = get_latest_candles(client, SYMBOL, xlong_ema_length * 50, client.KLINE_INTERVAL_1MINUTE)
     data['EMA_short'] = ta.ema(length=short_ema_length, close=data['Close'])
     data['EMA_mid'] = ta.ema(length=mid_ema_length, close=data['Close'])
     data['EMA_long'] = ta.ema(length=long_ema_length, close=data['Close'])

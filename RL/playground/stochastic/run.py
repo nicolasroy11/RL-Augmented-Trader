@@ -1,13 +1,12 @@
 import matplotlib.pyplot as plt
 import random
-
 import numpy as np
 from RL.playground.stochastic.policy import FeedForwardNN
 from RL.playground.stochastic.env import TradingEnvWithPnL
-from db.data_store import db_path
-
 import torch
 import torch.optim as optim
+from db.settings import DB_FILE_PATH
+
 
 # for reproduceable results
 seed = 77
@@ -139,4 +138,4 @@ if __name__ == "__main__":
     # run_stochastic_episodes(db_path, window_size, num_episodes)
 
     print("\n=== Running policy gradient training ===\n")
-    run_policy_gradient(db_path, window_size, num_episodes)
+    run_policy_gradient(DB_FILE_PATH, window_size, num_episodes)

@@ -1,5 +1,5 @@
-from traderplus.LR.base_environment import BaseTradingEnv
-from traderplus.db.data_store import db_path
+from RL.base_environment import BaseTradingEnv
+from db.data_store import db_path
 
 
 if __name__ == "__main__":

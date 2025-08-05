@@ -863,26 +863,6 @@ def log_vhft_action(action: Any, file_path: str):
             _csv.writerow([type, timestamp, quantity, price, profit, buy_time_indicators])
 
 
-def get_csv_price_logs() -> pd.DataFrame:
-    def convert_floats(row: List[Any]):
-        for i, value in enumerate(row):
-            try:
-                row[i] = float(row[i])
-            except:
-                continue
-        return row
-
-    file_path: str = 'traderplus/timeseries.csv'
-    with open(file_path, mode='r') as trades_file:
-        rows = trades_file.readlines()
-        headers = rows[0].split(',')
-        trades = [convert_floats(row.removesuffix('\n').split(',')) for row in rows if row != '\n'][1:]
-
-        df = pd.DataFrame.from_records(trades, columns=list(headers))
-    
-    return df
-
-
 def wait_til_candle_close(client: Client, symbol: str, candle_interval: str):
     time.sleep(2)
     now = datetime.now()

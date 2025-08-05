@@ -44,7 +44,7 @@ The problem, as some may have guessed, is that in a steep downtrend, the occasio
 
 One solution was to increase what I call the reluctance factor, which is a very primitive coefficient used to determine the maximum amount that can be spent on a single trade at any point in a trade cycle. Simply put, that amount will be 
 
-wallet size/reluctance factor.
+    highest single buy size = wallet size/reluctance factor.
 
 This crude method at least puts a clamp on runaway buying, the tradeoff being that in an upward trending market, the agent will only be making tiny profits, since it is saving its larger buys for lower lows.
 

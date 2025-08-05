@@ -57,20 +57,19 @@ The RL folder houses the logic that will produce our model. In a bid to decouple
 ### 1. Clone the repo
 ```bash
 git clone https://github.com/nicolasroy11/RL-Augmented-Trader.git
-cd RL-Augmented-Trader
 ```
 
-### Navigate Into The Repo
+### Navigate into the repo
 ```bash
 cd RL-Augmented-Trader
 ```
 
-### Install The Requirements
+### Install the requirements
 ```bash
 pip install -r requirements.txt
 ```
 
-### Run The Data Storage For Any Desired Amount Of Time
+### Run the data storage for any desired amount of time
 before the step , you may need to set the python path using
 ```bash
 export PYTHONPATH=.

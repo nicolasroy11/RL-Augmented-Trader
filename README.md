@@ -1,10 +1,23 @@
 # RL-Augmented-Trader
-## A real-time, deep reinforcement learning trading bot that uses live Binance 5-second tick data, technical indicators, and a custom PyTorch policy gradient agent to make buy/hold/sell decisions. The environment simulates live market PnL and is built from scratch without high-level libraries like Stable-Baselines.
 
+**A real-time, deep reinforcement learning trading bot using live Binance 5-second tick data, technical indicators, and a custom PyTorch policy gradient agent to make buy/hold/sell decisions.**
+
+This project is a hands-on experiment in building an RL-powered trading system from scratch — no high-level frameworks like Stable-Baselines. Just raw PyTorch, real-time data, and a simple, focused environment to simulate market PnL.
+
+---
 
 ## Why This Project?
 
-This project is part of my portfolio to demonstrate end-to-end applied machine learning in a financial context. It blends low-latency data pipelines, reinforcement learning, and custom environments — similar to what you might see in hedge fund research platforms.
+This is part of my portfolio to demonstrate **end-to-end applied machine learning** in a real financial setting. It combines:
+
+- Low-latency live data ingestion  
+- Feature engineering using technical indicators  
+- A from-scratch trading environment  
+- A custom RL agent (initially a policy gradient model)
+
+The goal? **Maximize real trading performance** — and push this agent to a level that would be compelling to hedge fund researchers and quant teams.
+
+---
 
 Contact: nicolasroy11@gmail.com
 
@@ -21,7 +34,7 @@ Contact: nicolasroy11@gmail.com
 ✅ Training insights: logits, action probabilities, PnL tracking
 
 
-### Background
+## Background: The Lowrider
 
 In my years of creating rules-based trading automations from absolute scratch, one agent has been consistently successful: the Lowrider. This agent's basic set of principles read like the age old adage of buy low, sell high. Here, the distinction happens in the methodology. The agent enters a trade cycle by buying a small amount without regards to market conditions and only sells when a profit is reached. But what happens if the market moves against its position? It buys again at the new, lower price, in what is commonly referred to as a DCA (dollar-cost averaging) maneuver. The lower the price goes, the higher the lot size being bought, and thus the faster the averaging catches up to the break-even point in such a way that your average upward market correction in a downward trend is enough to drive the average position price above break even. At this point, the agent sells. Selling a trade cycle at a loss is not an option - you either buy more or sell at a profit. In this way, the negative trade cycle outcome is mechanically impossible.
 
@@ -38,14 +51,21 @@ This crude method at least puts a clamp on runaway buying, the tradeoff being th
 There are many details involved in the sizing of lots, some of which actually involved using an integral to figure out, but that is outside the scope of this description, and a patent may be pending in the near future. For this reason, the Lowrider repo has to be kept private until this experiment concludes.
 
 
-### The RL Angle
+## The RL Angle: Adaptive Lot Sizing
 
 The contents of this repository will be an exploration of ways to better size lots given the current market conditions and adapt the Lowrider to use this to profit maximally in both upward and downward trending markets.
 
 The concept is rather simple: take in a time window of recent market observations, feed them to a neural network and output the probablities for three states: buy, sell, or hold. The buy probability can then be used directly on the lot calculation, leading to larger long-term gains.
 
 
-### This Repository
+## This Repository
+
+### Repo Structure TL;DR
+
+- `db/` — Data scraping, storage, and visualization modules. Collects and stores Binance 5-second tick data with technical indicators (RSI, EMA, MACD).  
+- `RL/` — Reinforcement learning agents and training scripts. Currently includes a stochastic policy gradient agent that learns over tick windows.
+
+---
 
 The db folder contains a module that strictly concerns itself with the scraping, storing, and visualization of raw data. Since the nature of volatile assets presents tiny opportunities to profitably buy and sell at any moment regardless of wider trend, I opted to walk away from querying trading platform APIs for minutely OHLV data, favoring the storage sub-minute instantaneous tick and technical indicator (RSI, MACD, EMA in various lengths,) exactly as they would appear in a live scenario. A quick snapshot of current conditions. The interval is adjustable, and the default is 5-second intervals.
 
@@ -96,4 +116,6 @@ python RL/playground/stochastic/run.py
 - [ ] Improve model performance tracking with additional tooling
 - [ ] Publish blog write-up on training insights
 - [ ] Once a successful model is generated, integrate it into the existing Lowrider code
-- [ ] Broadcast buy/sell signals on Zignaly for consumption by third party traders
+- [ ] Broadcast buy/sell signals for consumption by third party traders (Zignaly?)
+
+

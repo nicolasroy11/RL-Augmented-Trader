@@ -90,11 +90,8 @@ pip install -r requirements.txt
 ```
 
 ### Run the data storage for any desired amount of time
-before the step , you may need to set the python path using
 ```bash
 export PYTHONPATH=.
-```
-```bash
 python db/datastore.py
 ```
 

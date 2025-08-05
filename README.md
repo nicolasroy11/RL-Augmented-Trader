@@ -1,5 +1,5 @@
 # RL-Augmented-Trader
-## Traditional rules-based automations strategies supplemented with reinforcement learning 
+## A real-time, deep reinforcement learning trading bot that uses live Binance 5-second tick data, technical indicators, and a custom PyTorch policy gradient agent to make buy/hold/sell decisions. The environment simulates live market PnL and is built from scratch without high-level libraries like Stable-Baselines.
 
 ### Background
 

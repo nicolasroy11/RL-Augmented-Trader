@@ -86,14 +86,13 @@ def run_policy_gradient(db_path, window_size=10, num_episodes=20, gamma=0.99, lr
             action = dist.sample()
             log_prob = dist.log_prob(action)
 
-            print("Action probs:", action_probs.detach().numpy())
-
             obs, reward, done, info = env.step(action.item() - 1)  # map 0,1,2 → -1,0,1
 
             log_probs.append(log_prob)
             rewards.append(reward)
 
             cumulative_pnl += reward
+            print("Action probs:", action_probs.detach().numpy(), "cumulative_pnl: ", cumulative_pnl)
             episode_pnls.append(cumulative_pnl)
 
         # Compute discounted returns

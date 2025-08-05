@@ -8,14 +8,11 @@ import pandas_ta as ta
 from helpers import connection_is_good, get_latest_candles
 import os
 
-# Get absolute path to the directory where *this script* lives
 script_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Construct full path to the DuckDB file in the same folder
 db_path = os.path.join(script_dir, "ticks.duckdb")
 con = duckdb.connect(db_path)
 
-client = Client(runtime_settings.binance_com_api_key, runtime_settings.binance_com_secret_key, tld='com')
+client = Client(tld='com')
 symbol = 'BTCFDUSD'
 store_frequency_secs = 5
 

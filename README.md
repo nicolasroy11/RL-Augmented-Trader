@@ -1,6 +1,16 @@
 # RL-Augmented-Trader
 ## A real-time, deep reinforcement learning trading bot that uses live Binance 5-second tick data, technical indicators, and a custom PyTorch policy gradient agent to make buy/hold/sell decisions. The environment simulates live market PnL and is built from scratch without high-level libraries like Stable-Baselines.
 
+## Features
+
+✅ Real-time 5s data ingestion from Binance  
+✅ DuckDB-based tick storage for fast analytics  
+✅ Custom PyTorch RL agent (Policy Gradient)  
+✅ Live environment with simulated trading logic  
+✅ Normalized technical indicators: RSI, EMA, MACD  
+✅ Finplot-based data visualization  
+✅ Training insights: logits, action probabilities, PnL tracking
+
 ### Background
 
 In my years of creating rules-based trading automations from absolute scratch, one agent has been consistently successful: the Lowrider. This agent's basic set of principles read like the age old adage of buy low, sell high. Here, the distinction happens in the methodology. The agent enters a trade cycle by buying a small amount without regards to market conditions and only sells when a profit is reached. But what happens if the market moves against its position? It buys again at the new, lower price, in what is commonly referred to as a DCA (dollar-cost averaging) maneuver. The lower the price goes, the higher the lot size being bought, and thus the faster the averaging catches up to the break-even point in such a way that your average upward market correction in a downward trend is enough to drive the average position price above break even. At this point, the agent sells. Selling a trade cycle at a loss is not an option - you either buy more or sell at a profit. In this way, the negative trade cycle outcome is mechanically impossible.

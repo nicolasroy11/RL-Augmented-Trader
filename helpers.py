@@ -49,6 +49,7 @@ def get_last_low(client: Client, symbol: str, candle_interval: str):
     last_close = get_latest_closed_candles(client=client, symbol=symbol, candle_interval=candle_interval, num_of_candles_back=1)
     return float(last_close['Low'][-1])
 
+
 def get_last_close(client: Client, symbol: str, candle_interval: str):
     last_close = get_latest_closed_candles(client=client, symbol=symbol, candle_interval=candle_interval, num_of_candles_back=1)
     return float(last_close['Close'][-1])
@@ -88,6 +89,7 @@ def get_heikin_ashi_df(client: Client, symbol: str, num_of_candles_back: int, ca
     heikin_ashi_df.set_index('Datetime', inplace=True)
     return heikin_ashi_df
 
+
 def get_bid_ask_report(client: Client, symbol: str) -> BidAskReport:
     report = BidAskReport()
     ticker = client.get_ticker(symbol=symbol)
@@ -97,6 +99,7 @@ def get_bid_ask_report(client: Client, symbol: str) -> BidAskReport:
     report.bid_quantity = float(ticker['bidQty'])
     report.spread = round((1 - float(ticker['bidPrice']) / float(ticker['askPrice'])) * 100, 5)
     return report
+
 
 def get_buytime_spread(client: Client, symbol: str) -> float:
     ticker = client.get_ticker(symbol=symbol)
@@ -230,6 +233,7 @@ def do_limit_buy(client: Client, symbol: str, price: float, quantity: float, id:
     report.end_time = datetime.now()
     return report
 
+
 def do_futures_limit_buy(client: Client, symbol: str, price: float, quantity: float, id: str, print_logs=True) -> OrderReport:
     
     # check notional minimum sell amount
@@ -342,7 +346,6 @@ def do_futures_limit_buy(client: Client, symbol: str, price: float, quantity: fl
                     buy_order_cancelled = True
                 except:
                     pass
-
     try:
         buy_order = client.futures_get_order(symbol=symbol, orderId=buy_order_id)   # we get the latest copy just in case; try-catch used in case order was canceled and is 404
     except:
@@ -431,10 +434,9 @@ def do_lightning_limit_buy(client: Client, symbol: str, price: float, quantity: 
     return report
 
 
-
 def do_market_buy(client: Client, symbol: str, quantity: float, print_logs=True) -> OrderReport:
     
-    # check ticker for bid/ask spread
+    # TODO: check ticker for bid/ask spread
     
     report = OrderReport()
     report.type = OrderType.MARKET
@@ -569,6 +571,7 @@ def do_limit_sell(client: Client, symbol: str, quantity: float, high_limit: floa
     report.end_time = datetime.now()
     return report
 
+
 def cancel_order(client: Client, symbol: str, order_id: str):
     client.cancel_order(
         symbol=symbol,
@@ -659,6 +662,7 @@ def do_timed_limit_sell(client: Client, symbol: str, quantity: float, high_limit
     report.end_time = datetime.now()
     return report
 
+
 async def do_trailing_stop_loss_market_sell(client: Client, symbol: str, quantity: float, starting_benchmark: float, TSL_tolerance: float) -> OrderReport:
     bsm = BinanceSocketManager(client)
     socket = bsm.trade_socket(symbol)
@@ -722,15 +726,18 @@ def log_trade(start_time: datetime, end_time: datetime, trade_duration: float, s
         trades_csv = csv.writer(trades_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         trades_csv.writerow([start_time, end_time, trade_duration, buy_strike_price, sell_strike_price, buy_quantity, sell_quantity, num_of_times_dca_used, start_balance, end_balance, f'{trade_profit_pct}%', f'${trade_profit}'])
 
+
 def log_strategy_params(params_string: str, file_path: str = 'traderplus/trades.csv'):
     with open(file_path, mode='a') as trades_file:
         trades_csv = csv.writer(trades_file, delimiter=',')
         trades_csv.writerow([params_string])
 
+
 def log_message_csv(message: str, file_path: str = 'traderplus/trades.csv'):
     with open(file_path, mode='a') as trades_file:
         trades_csv = csv.writer(trades_file, delimiter=',')
         trades_csv.writerow([message])
+
 
 def log_loop_csv(loop_report: LoopReport, file_path: str):
     with open(file_path, mode='a') as trades_file:
@@ -752,9 +759,11 @@ def log_loop_csv(loop_report: LoopReport, file_path: str):
             loop_report.ema_slope
         ])
 
+
 def log_message(message: str, file_path: str):
     with open(file_path, mode='a') as file:
         file.writelines(message)
+
 
 def log_strategy_trade(report: TradeCycleReport, file_path: str = 'traderplus/trades.csv'):
     trade_profit = round(report.end_balance - report.start_balance, 2)
@@ -781,7 +790,8 @@ def log_strategy_trade(report: TradeCycleReport, file_path: str = 'traderplus/tr
             f'${trade_profit}',
             report.buy_time_indicators,
             report.notes])
-        
+
+
 def log_straight_shot_strategy_trade(report: TradeCycleReport, file_path: str = 'traderplus/trades.csv'):
     trade_profit = round(report.end_balance - report.start_balance, 2)
     investment_profit_pct = round((trade_profit/report.investment_peak), 4) * 100
@@ -805,6 +815,7 @@ def log_straight_shot_strategy_trade(report: TradeCycleReport, file_path: str = 
             report.buy_time_indicators,
             report.notes])
 
+
 def log_HTF_trade(report: TradeCycleReport):
     with open('traderplus/HFT_trades.csv', mode='a') as trades_file:
         trades_csv = csv.writer(trades_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -816,6 +827,7 @@ def log_HTF_trade(report: TradeCycleReport):
         trade_profit = report.end_balance - report.start_balance
         num_of_buys = report.num_of_times_dca_used
         trades_csv.writerow([start_time, end_time, trade_duration, num_of_buys, start_balance, end_balance, trade_profit, report.notes])
+
 
 def log_live_price(ticker_data: Any, file_path: str):
     with open(file_path, mode='a') as file:
@@ -837,6 +849,7 @@ def log_live_price(ticker_data: Any, file_path: str):
             lowPrice = ticker_data['lowPrice']
             volume = ticker_data['volume']
             _csv.writerow([symbol, timestamp, priceChange, priceChangePercent, weightedAvgPrice, prevClosePrice, lastPrice, lastQty, bidPrice, bidQty, askPrice, askQty, openPrice, highPrice, lowPrice, volume])
+
 
 def log_vhft_action(action: Any, file_path: str):
     with open(file_path, mode='a') as file:
@@ -895,8 +908,8 @@ def get_symbol_info(client: Client, symbol: str) -> SymbolParams:
             params.min_lot_size = float(filter['minQty'])
 
     return params
-  
-    
+
+
 def sigmoid(x: float):
   return 1 / (1 + math.exp(-x))
 

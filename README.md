@@ -2,7 +2,7 @@
 
 **A real-time, deep reinforcement learning trading bot using live Binance 5-second tick data, technical indicators, and a custom PyTorch policy gradient agent to make buy/hold/sell decisions.**
 
-This project is a hands-on experiment in building an RL-powered trading system from scratch — no high-level frameworks like Stable-Baselines. Just raw PyTorch, real-time data, and a simple, focused environment to simulate market PnL.
+This project is a hands-on experiment in building an RL-powered trading system from scratch — no high-level frameworks like Stable-Baselines or FreqTrade. Just raw PyTorch, real-time data, and a simple, focused environment to simulate market PnL.
 
 ---
 

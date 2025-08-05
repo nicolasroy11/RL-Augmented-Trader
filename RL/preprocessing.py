@@ -1,7 +1,7 @@
 from typing import List
 import numpy as np
 
-from traderplus.db.data_store import Tick
+from db.data_store import Tick
 
 def extract_features(ticks: List[Tick]):
     prices = np.array([tick.price for tick in ticks])

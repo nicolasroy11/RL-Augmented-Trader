@@ -2,9 +2,9 @@ import matplotlib.pyplot as plt
 import random
 
 import numpy as np
-from traderplus.LR.strategy_tests.stochastic.policy import FeedForwardNN
-from traderplus.LR.strategy_tests.stochastic.env import TradingEnvWithPnL
-from traderplus.db.data_store import db_path
+from RL.playground.stochastic.policy import FeedForwardNN
+from RL.playground.stochastic.env import TradingEnvWithPnL
+from db.data_store import db_path
 
 import torch
 import torch.optim as optim

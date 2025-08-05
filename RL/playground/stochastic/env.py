@@ -1,5 +1,5 @@
 import numpy as np
-from traderplus.LR.base_environment import BaseTradingEnv
+from RL.base_environment import BaseTradingEnv
 
 class TradingEnvWithPnL(BaseTradingEnv):
     def __init__(self, db_path, window_size=10, initial_cash=1000000):

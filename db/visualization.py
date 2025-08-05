@@ -2,10 +2,10 @@ import duckdb
 import finplot as fplt
 import pandas as pd
 import os
-from traderplus.db.data_store import db_path
+from db.data_store import db_path
 
 # --- Connect to your ticks.duckdb file ---
-con = duckdb.connect(db_path)
+con = duckdb.connect(db_path, read_only=True)
 
 # Fetch the data
 df = con.execute("SELECT * FROM ticks ORDER BY timestamp ASC").fetchdf()

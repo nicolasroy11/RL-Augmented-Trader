@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import time
 import runtime_settings
 import pandas_ta as ta
-from traderplus.helpers import connection_is_good, get_latest_candles, get_latest_closed_candles
+from helpers import connection_is_good, get_latest_candles
 import os
 
 # Get absolute path to the directory where *this script* lives

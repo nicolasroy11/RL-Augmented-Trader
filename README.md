@@ -4,7 +4,7 @@
 
 ## Why This Project?
 
-This project is part of my portfolio to demonstrate end-to-end applied machine learning in a financial context. It blends low-latency data pipelines, reinforcement learning, and custom environments — similar to what you'd see in hedge fund research platforms.
+This project is part of my portfolio to demonstrate end-to-end applied machine learning in a financial context. It blends low-latency data pipelines, reinforcement learning, and custom environments — similar to what you might see in hedge fund research platforms.
 
 Contact: nicolasroy11@gmail.com
 

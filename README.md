@@ -52,7 +52,7 @@ The db folder contains a module that strictly concerns itself with the scraping,
 The RL folder houses the logic that will produce our model. In a bid to decouple this approach from my own trading biases and observations, I opted to start the exploration off with a purely stochastic run. Just collect a large amount of ticks and indicators and let the simplest feed-forward network buy and sell at random while keeping track of reward and PnL states. From observing the output vector change in real time as the network works through the data, it is visually evident that converging values are reached, confirming the model's confidence in its increasing experience.
 
 
-## 🚀 Getting Started 🚀
+## Getting Started 🚀
 
 ### 1. Clone the repo
 ```bash

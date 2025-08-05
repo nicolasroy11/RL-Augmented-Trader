@@ -74,6 +74,7 @@ def run_policy_gradient(db_path, window_size=10, num_episodes=20, gamma=0.99, lr
         log_probs = []
         rewards = []
         cumulative_pnl = 0.0
+        episode_number = 0
         episode_pnls = []
 
         print(f"Starting Episode {ep + 1}")
@@ -92,7 +93,7 @@ def run_policy_gradient(db_path, window_size=10, num_episodes=20, gamma=0.99, lr
             rewards.append(reward)
 
             cumulative_pnl += reward
-            print("Action probs:", action_probs.detach().numpy(), "cumulative_pnl: ", cumulative_pnl)
+            print("action probs:", action_probs.detach().numpy(), "\tcumulative_pnl: ", cumulative_pnl, f'\tepisode # {episode_number}')
             episode_pnls.append(cumulative_pnl)
 
         # Compute discounted returns

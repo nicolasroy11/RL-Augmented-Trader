@@ -1,0 +1,142 @@
+import matplotlib.pyplot as plt
+import random
+
+import numpy as np
+from traderplus.LR.strategy_tests.stochastic.policy import FeedForwardNN
+from traderplus.LR.strategy_tests.stochastic.env import TradingEnvWithPnL
+from traderplus.db.data_store import db_path
+
+import torch
+import torch.optim as optim
+
+# for reproduceable results
+seed = 77
+random.seed(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
+
+
+def run_stochastic_episodes(db_path, window_size=10, num_episodes=20):
+    all_episode_pnls = []
+
+    for ep in range(num_episodes):
+        env = TradingEnvWithPnL(db_path, window_size=window_size)
+        obs = env.reset()
+        done = False
+
+        cumulative_pnl = 0.0
+        episode_pnls = []
+
+        print(f"Starting Episode {ep + 1}")
+
+        while not done:
+            # Random action example: -1 = sell, 0 = hold, 1 = buy
+            action = random.choice([-1, 0, 1])
+            obs, reward, done, info = env.step(action)
+
+            cumulative_pnl += reward
+            episode_pnls.append(cumulative_pnl)
+
+        all_episode_pnls.append(episode_pnls)
+        print(f"Episode {ep + 1} finished. Total PnL: {cumulative_pnl:.2f}")
+
+    # Plot PnL for all episodes
+    plt.figure(figsize=(12, 6))
+    for i, ep_pnl in enumerate(all_episode_pnls):
+        plt.plot(range(len(ep_pnl)), ep_pnl, label=f"Episode {i+1}")
+    plt.xlabel("Step within Episode")
+    plt.ylabel("Cumulative PnL")
+    plt.title("PnL Progression Across Episodes")
+    plt.legend()
+    plt.show()
+
+
+def run_policy_gradient(db_path, window_size=10, num_episodes=20, gamma=0.99, lr=1e-3):
+    # Initialize dummy env to get observation shape
+    dummy_env = TradingEnvWithPnL(db_path, window_size=window_size)
+    dummy_obs = dummy_env.reset()
+    input_dim = dummy_obs.shape[0] * dummy_obs.shape[1]  # Flattened observation size
+
+    # Initialize policy and optimizer once
+    policy = FeedForwardNN(input_dim)
+    for name, param in policy.named_parameters():
+        print(f"{name}: mean={param.data.mean():.4f}, std={param.data.std():.4f}, max={param.data.max():.4f}, min={param.data.min():.4f}")
+
+    optimizer = optim.Adam(policy.parameters(), lr=lr)
+
+    all_episode_pnls = []
+
+    for ep in range(num_episodes):
+        # New environment per episode
+        env = TradingEnvWithPnL(db_path, window_size=window_size)
+        obs = env.normalized_reset()
+        done = False
+
+        log_probs = []
+        rewards = []
+        cumulative_pnl = 0.0
+        episode_pnls = []
+
+        print(f"Starting Episode {ep + 1}")
+
+        while not done:
+            # Flatten observation
+            state = torch.tensor(obs, dtype=torch.float32).flatten().unsqueeze(0)  # shape: (1, input_dim)
+            action_probs = policy(state)
+            dist = torch.distributions.Categorical(action_probs)
+            action = dist.sample()
+            log_prob = dist.log_prob(action)
+
+            print("Action probs:", action_probs.detach().numpy())
+
+            obs, reward, done, info = env.step(action.item() - 1)  # map 0,1,2 → -1,0,1
+
+            log_probs.append(log_prob)
+            rewards.append(reward)
+
+            cumulative_pnl += reward
+            episode_pnls.append(cumulative_pnl)
+
+        # Compute discounted returns
+        returns = []
+        R = 0
+        for r in reversed(rewards):
+            R = r + gamma * R
+            returns.insert(0, R)
+        returns = torch.tensor(returns, dtype=torch.float32)
+        if returns.std() > 0:
+            returns = (returns - returns.mean()) / (returns.std() + 1e-9)  # Normalize
+
+        # Policy gradient update
+        loss = 0
+        for log_prob, R in zip(log_probs, returns):
+            loss -= log_prob * R
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        all_episode_pnls.append(episode_pnls)
+        print(f"Episode {ep + 1} finished. Total PnL: {cumulative_pnl:.2f}")
+
+    # Plot results
+    plt.figure(figsize=(12, 6))
+    for i, ep_pnl in enumerate(all_episode_pnls):
+        plt.plot(range(len(ep_pnl)), ep_pnl, label=f"Episode {i+1}")
+    plt.xlabel("Step within Episode")
+    plt.ylabel("Cumulative PnL")
+    plt.title("PnL Progression Across Episodes (Policy Gradient)")
+    plt.legend()
+    plt.show()
+    t = 0
+
+
+if __name__ == "__main__":
+    # Customize these
+    window_size = 150
+    num_episodes = 100
+    
+    # print("\n=== Running pure random baseline ===\n")
+    # run_stochastic_episodes(db_path, window_size, num_episodes)
+
+    print("\n=== Running policy gradient training ===\n")
+    run_policy_gradient(db_path, window_size, num_episodes)

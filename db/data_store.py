@@ -3,9 +3,9 @@ from binance.client import Client
 import duckdb
 from datetime import datetime, timezone
 import time
-import pandas_ta as ta
+import pandas as pd
 from db.settings import DB_FILE_PATH, SYMBOL
-from helpers import connection_is_good, get_latest_candles
+from helpers import add_bollinger_bands, add_ema, add_macd, add_rsi, connection_is_good, get_latest_candles
 
 
 client = Client(tld='com')
@@ -26,12 +26,15 @@ class Tick:
     macd_line: float
     macd_hist: float
     macd_signal: float
+    bb_upper: float
+    bb_middle: float
+    bb_lower: float
 
 
 class DataStore:
 
     def __init__(self, db_path: str, readonly: bool = True):
-        self.con = duckdb.connect(db_path)
+        self.con = duckdb.connect(db_path, read_only=readonly)
 
 
     def create_table(self):
@@ -48,23 +51,26 @@ class DataStore:
                 ema_xlong DOUBLE,
                 macd_line DOUBLE,
                 macd_hist DOUBLE,
-                macd_signal DOUBLE
+                macd_signal DOUBLE,
+                bb_upper DOUBLE,
+                bb_middle DOUBLE,
+                bb_lower DOUBLE
             )
         """)
 
 
     def insert_tick_data(self, tick: Tick):
         self.con.execute("""
-            INSERT INTO ticks (timestamp, price, rsi_5, rsi_7, rsi_12, ema_short, ema_mid, ema_long, ema_xlong, macd_line, macd_hist, macd_signal)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (tick.timestamp, tick.price, tick.rsi_5, tick.rsi_7, tick.rsi_12, tick.ema_short, tick.ema_mid, tick.ema_long, tick.ema_xlong, tick.macd_line, tick.macd_hist, tick.macd_signal))
+            INSERT INTO ticks (timestamp, price, rsi_5, rsi_7, rsi_12, ema_short, ema_mid, ema_long, ema_xlong, macd_line, macd_hist, macd_signal, bb_upper, bb_middle, bb_lower)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (tick.timestamp, tick.price, tick.rsi_5, tick.rsi_7, tick.rsi_12, tick.ema_short, tick.ema_mid, tick.ema_long, tick.ema_xlong, tick.macd_line, tick.macd_hist, tick.macd_signal, tick.bb_upper, tick.bb_middle, tick.bb_lower))
 
 
     def insert_empty_tick_data(self, timestamp: datetime):
         self.con.execute("""
-            INSERT INTO ticks (timestamp, price, rsi_5, rsi_7, rsi_12, ema_short, ema_mid, ema_long, ema_xlong, macd_line, macd_hist, macd_signal)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (timestamp, None, None, None, None, None, None, None, None, None, None, None))
+            INSERT INTO ticks (timestamp, price, rsi_5, rsi_7, rsi_12, ema_short, ema_mid, ema_long, ema_xlong, macd_line, macd_hist, macd_signal, bb_upper, bb_middle, bb_lower)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (timestamp, None, None, None, None, None, None, None, None, None, None, None, None, None, None))
 
 
     def poll_and_store(self):
@@ -97,19 +103,33 @@ class DataStore:
         ts = datetime.now(timezone.utc)
         ticker = client.get_symbol_ticker(symbol=SYMBOL)
         price = float(ticker['price'])
-        data = get_latest_candles(client, SYMBOL, xlong_ema_length * 50, client.KLINE_INTERVAL_1MINUTE)
-        data['EMA_short'] = ta.ema(length=short_ema_length, close=data['Close'])
-        data['EMA_mid'] = ta.ema(length=mid_ema_length, close=data['Close'])
-        data['EMA_long'] = ta.ema(length=long_ema_length, close=data['Close'])
-        data['EMA_xlong'] = ta.ema(length=xlong_ema_length, close=data['Close'])
-        data['RSI_5'] = ta.rsi(length=short_rsi_length, close=data['Close'])
-        data['RSI_7'] = ta.rsi(length=mid_rsi_length, close=data['Close'])
-        data['RSI_12'] = ta.rsi(length=long_rsi_length, close=data['Close'])
-        macd = ta.macd(close=data['Close'])
-        macd_line = macd['MACD_12_26_9'].iloc[-1]
-        macd_hist = macd['MACDh_12_26_9'].iloc[-1]
-        macd_signal = macd['MACDs_12_26_9'].iloc[-1]
-        tick = Tick(ts, price, data['RSI_5'].iloc[-1], data['RSI_7'].iloc[-1], data['RSI_12'].iloc[-1], data['EMA_short'].iloc[-1], data['EMA_mid'].iloc[-1], data['EMA_long'].iloc[-1], data['EMA_xlong'].iloc[-1], macd_line, macd_hist, macd_signal)
+        data: pd.DataFrame = get_latest_candles(client, SYMBOL, xlong_ema_length * 50, client.KLINE_INTERVAL_1MINUTE)
+        data = add_rsi(data, length=short_rsi_length)
+        data = add_rsi(data, length=mid_rsi_length)
+        data = add_rsi(data, length=long_rsi_length)
+        data = add_ema(data, length=short_ema_length)
+        data = add_ema(data, length=mid_ema_length)
+        data = add_ema(data, length=long_ema_length)
+        data = add_ema(data, length=xlong_ema_length)
+        data = add_macd(data)
+        data = add_bollinger_bands(data, length=14, std_dev=2.0)
+        tick = Tick(
+                        ts,
+                        price,
+                        data[f'rsi_{short_rsi_length}'].iloc[-1],
+                        data[f'rsi_{mid_rsi_length}'].iloc[-1],
+                        data[f'rsi_{long_rsi_length}'].iloc[-1],
+                        data[f'ema_{short_ema_length}'].iloc[-1],
+                        data[f'ema_{mid_ema_length}'].iloc[-1],
+                        data[f'ema_{long_ema_length}'].iloc[-1],
+                        data[f'ema_{xlong_ema_length}'].iloc[-1],
+                        data['macd_line'].iloc[-1],
+                        data['macd_hist'].iloc[-1],
+                        data['macd_signal'].iloc[-1],
+                        data['bb_upper'].iloc[-1],
+                        data['bb_middle'].iloc[-1],
+                        data['bb_lower'].iloc[-1]
+                    )
         return tick
     
     
@@ -126,7 +146,6 @@ class DataStore:
     def get_all_tick_data(self):
         df = self.con.execute("SELECT * FROM ticks ORDER BY timestamp ASC").fetchdf()
         return df
-
 
 
 if __name__ == "__main__":

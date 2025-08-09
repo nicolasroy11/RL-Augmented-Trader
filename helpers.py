@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from binance import BinanceSocketManager
 import os
+import pandas_ta as ta
 
 
 def get_raw_ohlcv_dataframe(client: Client, symbol: str, num_of_candles_back: int, candle_interval: str):
@@ -915,6 +916,32 @@ def synchronize_time_server():
         os.system('date ' + time.strftime('%m%d%H%M%Y.%S',time.localtime(response.tx_time)))
     except:
         print('Could not sync with time server.')
+
+
+def add_rsi(df: pd.DataFrame, length: int) -> pd.DataFrame:
+    df[f'rsi_{length}'] = ta.rsi(df['Close'], length=length)
+    return df
+
+
+def add_ema(df: pd.DataFrame, length: int) -> pd.DataFrame:
+    df[f'ema_{length}'] = ta.ema(df['Close'], length=length)
+    return df
+
+
+def add_macd(df: pd.DataFrame) -> pd.DataFrame:
+    macd = ta.macd(df['Close'])
+    df['macd_line'] = macd['MACD_12_26_9']
+    df['macd_hist'] = macd['MACDh_12_26_9']
+    df['macd_signal'] = macd['MACDs_12_26_9']
+    return df
+
+
+def add_bollinger_bands(df: pd.DataFrame, length: int = 20, std_dev: float = 2.0) -> pd.DataFrame:
+    bb = ta.bbands(df['Close'], length=length, std=std_dev)
+    df['bb_upper'] = bb[f'BBU_{length}_{std_dev}']
+    df['bb_middle'] = bb[f'BBM_{length}_{std_dev}']
+    df['bb_lower'] = bb[f'BBL_{length}_{std_dev}']
+    return df
 
 
 def connection_is_good(client: Client, wait_until_true = True) -> bool:

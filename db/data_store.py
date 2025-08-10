@@ -29,6 +29,9 @@ class Tick:
     bb_upper: float
     bb_middle: float
     bb_lower: float
+    bb_width: float
+    percent_b: float
+    z_bb: float
 
 
 class DataStore:
@@ -54,42 +57,49 @@ class DataStore:
                 macd_signal DOUBLE,
                 bb_upper DOUBLE,
                 bb_middle DOUBLE,
-                bb_lower DOUBLE
+                bb_lower DOUBLE,
+                bb_width DOUBLE,
+                percent_b DOUBLE,
+                z_bb DOUBLE
             )
         """)
 
 
     def insert_tick_data(self, tick: Tick):
         self.con.execute("""
-            INSERT INTO ticks (timestamp, price, rsi_5, rsi_7, rsi_12, ema_short, ema_mid, ema_long, ema_xlong, macd_line, macd_hist, macd_signal, bb_upper, bb_middle, bb_lower)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (tick.timestamp, tick.price, tick.rsi_5, tick.rsi_7, tick.rsi_12, tick.ema_short, tick.ema_mid, tick.ema_long, tick.ema_xlong, tick.macd_line, tick.macd_hist, tick.macd_signal, tick.bb_upper, tick.bb_middle, tick.bb_lower))
+            INSERT INTO ticks (timestamp, price, rsi_5, rsi_7, rsi_12, ema_short, ema_mid, ema_long, ema_xlong, macd_line, macd_hist, macd_signal, bb_upper, bb_middle, bb_lower, bb_width, percent_b, z_bb)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (tick.timestamp, tick.price, tick.rsi_5, tick.rsi_7, tick.rsi_12, tick.ema_short, tick.ema_mid, tick.ema_long, tick.ema_xlong, tick.macd_line, tick.macd_hist, tick.macd_signal, tick.bb_upper, tick.bb_middle, tick.bb_lower, tick.bb_width, tick.percent_b, tick.z_bb))
 
 
     def insert_empty_tick_data(self, timestamp: datetime):
         self.con.execute("""
-            INSERT INTO ticks (timestamp, price, rsi_5, rsi_7, rsi_12, ema_short, ema_mid, ema_long, ema_xlong, macd_line, macd_hist, macd_signal, bb_upper, bb_middle, bb_lower)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (timestamp, None, None, None, None, None, None, None, None, None, None, None, None, None, None))
+            INSERT INTO ticks (timestamp, price, rsi_5, rsi_7, rsi_12, ema_short, ema_mid, ema_long, ema_xlong, macd_line, macd_hist, macd_signal, bb_upper, bb_middle, bb_lower, bb_width, percent_b, z_bb)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (timestamp, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None))
 
 
-    def poll_and_store(self):
+    def continuous_poll_and_store(self):
         while True:
             t0 = time.time()
-            if connection_is_good(client=client, wait_until_true=False):
-                try:
-                    tick = self.get_tick_data()
-                    self.insert_tick_data(tick)
-                    print(f'stored: {tick.timestamp}')
-                except BaseException as e:
-                    now = datetime.now(timezone.utc)
-                    self.insert_empty_tick_data(timestamp=now)
-            else:
-                now = datetime.now(timezone.utc)
-                self.insert_empty_tick_data(timestamp=now)
+            self.single_poll_and_store()
             t1 = time.time()
             time_to_sleep = store_frequency_secs - (t1 - t0)
             if time_to_sleep > 0: time.sleep(time_to_sleep)
+
+    
+    def single_poll_and_store(self):
+        if connection_is_good(client=client, wait_until_true=False):
+            try:
+                tick = self.get_tick_data()
+                self.insert_tick_data(tick)
+                print(f'stored: {tick.timestamp}')
+            except BaseException as e:
+                now = datetime.now(timezone.utc)
+                self.insert_empty_tick_data(timestamp=now)
+        else:
+            now = datetime.now(timezone.utc)
+            self.insert_empty_tick_data(timestamp=now)
 
 
     def get_tick_data(self) -> Tick:
@@ -100,6 +110,7 @@ class DataStore:
         short_rsi_length = 5
         mid_rsi_length = 7
         long_rsi_length = 12
+        bollinger_length = 14
         ts = datetime.now(timezone.utc)
         ticker = client.get_symbol_ticker(symbol=SYMBOL)
         price = float(ticker['price'])
@@ -112,7 +123,7 @@ class DataStore:
         data = add_ema(data, length=long_ema_length)
         data = add_ema(data, length=xlong_ema_length)
         data = add_macd(data)
-        data = add_bollinger_bands(data, length=14, std_dev=2.0)
+        data = add_bollinger_bands(data, length=bollinger_length, std_dev=2.0)
         tick = Tick(
                         ts,
                         price,
@@ -128,7 +139,10 @@ class DataStore:
                         data['macd_signal'].iloc[-1],
                         data['bb_upper'].iloc[-1],
                         data['bb_middle'].iloc[-1],
-                        data['bb_lower'].iloc[-1]
+                        data['bb_lower'].iloc[-1],
+                        data['bb_width'].iloc[-1],
+                        data['percent_b'].iloc[-1],
+                        data['z_bb'].iloc[-1]
                     )
         return tick
     
@@ -151,4 +165,4 @@ class DataStore:
 if __name__ == "__main__":
     datastore = DataStore(DB_FILE_PATH, readonly=False)
     datastore.create_table()
-    datastore.poll_and_store()
+    datastore.continuous_poll_and_store()

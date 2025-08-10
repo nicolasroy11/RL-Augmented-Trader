@@ -941,6 +941,12 @@ def add_bollinger_bands(df: pd.DataFrame, length: int = 20, std_dev: float = 2.0
     df['bb_upper'] = bb[f'BBU_{length}_{std_dev}']
     df['bb_middle'] = bb[f'BBM_{length}_{std_dev}']
     df['bb_lower'] = bb[f'BBL_{length}_{std_dev}']
+
+    # derived features
+    std = df['Close'].rolling(window=length, min_periods=1).std(ddof=0).fillna(0.0)
+    df['bb_width'] = df['bb_upper'] - df['bb_lower']
+    df['percent_b'] = (df['Close'] - df['bb_lower']) / (df['bb_width'].replace({0: np.nan}))
+    df['z_bb'] = (df['Close'] - df['bb_middle']) / (std.replace({0: np.nan}))
     return df
 
 

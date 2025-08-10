@@ -4,6 +4,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from db.data_store import DataStore
 from django.conf import settings
 
+data_store: DataStore = None
 
 class DataApp(AppConfig):
     name = "data_app"

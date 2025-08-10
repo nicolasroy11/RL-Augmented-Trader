@@ -3,7 +3,7 @@ from django.shortcuts import render
 # Create your views here.
 from django.http import HttpResponse
 import datetime
-from service.service_app.apps import current_trade_cycle
+from services.service_app.apps import current_trade_cycle
 
 
 def current_datetime(request):

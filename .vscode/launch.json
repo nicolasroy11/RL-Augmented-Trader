@@ -23,7 +23,7 @@
             "args": [
                 "runserver",
                 "--noreload",
-                "localhost:8000"
+                "localhost:3000"
             ],
             "env": {
                 "PYTHONPATH": "."

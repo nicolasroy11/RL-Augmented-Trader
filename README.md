@@ -29,9 +29,10 @@ Contact: nicolasroy11@gmail.com
 ✅ DuckDB-based tick storage for fast analytics  
 ✅ Custom PyTorch RL agent (Policy Gradient)  
 ✅ Live environment with simulated trading logic  
-✅ Normalized technical indicators: RSI, EMA, MACD  
+✅ Normalized technical indicators: RSI, EMA, MACD, Bollinger bands
 ✅ Finplot-based data visualization  
 ✅ Training insights: logits, action probabilities, PnL tracking
+✅ Django apps for visualization and eventually meaningful interaction
 
 
 ## Background: The Lowrider
@@ -64,12 +65,15 @@ The concept is rather simple: take in a time window of recent market observation
 
 - `db/` — Data scraping, storage, and visualization modules. Collects and stores Binance 5-second tick data with technical indicators (RSI, EMA, MACD).  
 - `RL/` — Reinforcement learning agents and training scripts. Currently includes a stochastic policy gradient agent that learns over tick windows.
+- `services/` — Django services that will be used to make this project interactive over the web.
 
 ---
 
 The db folder contains a module that strictly concerns itself with the scraping, storing, and visualization of raw data. Since the nature of volatile assets presents tiny opportunities to profitably buy and sell at any moment regardless of wider trend, I opted to walk away from querying trading platform APIs for minutely OHLCV data, favoring the storage of sub-minute instantaneous tick and technical indicator (RSI, MACD, EMA in various lengths,) exactly as they would appear in a live scenario. A quick snapshot of current conditions. The interval is adjustable, and the default is 5-second intervals.
 
 The RL folder houses the logic that will produce our model. In a bid to decouple this approach from my own trading biases and observations, I opted to start the exploration off with a purely stochastic run. Just collect a large amount of ticks and indicators and let the simplest feed-forward network buy and sell at random while keeping track of reward and PnL states. From observing the output vector change in real time as the network works through the data, it is visually evident that converging values are reached, confirming the model's confidence in its increasing experience.
+
+The services folder is the home folder of all things Django service. I tend to set up Django services in a particular way as to make adding endpoints and functionality semantic and easy and using decorators in the same way they are used in .NET where type safety and return data structures are documented and Swagger-ready. This set of services will allow for theongoing processes of agent automation to be modified and occasionally course-corrected in real time if need be.
 
 
 ## Getting Started 🚀
@@ -114,5 +118,7 @@ python RL/playground/stochastic/run.py
 - [ ] Publish blog write-up on training insights
 - [ ] Once a successful model is generated, integrate it into the existing Lowrider code
 - [ ] Broadcast buy/sell signals for consumption by third party traders (Zignaly?)
+- [ ] Include LSTM/GRU networks in the RL process to strengthen regime awareness
+- [ ] Expand Django apps to expose the process to external parties
 
 

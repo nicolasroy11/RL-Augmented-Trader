@@ -15,7 +15,7 @@ This experiment is meant to enhance an existing, successful, rules-based trading
 - A from-scratch trading environment  
 - A custom RL agent (initially a policy gradient model)
 
-The goal? **Maximize real trading performance** — and push this agent to a level that would be compelling to hedge fund researchers and quant teams.
+The goal is to **maximize real trading performance** and push this agent to a level that would be compelling to hedge fund researchers and quant teams.
 
 ---
 

@@ -8,7 +8,7 @@ This project is a hands-on experiment in building an RL-powered trading system f
 
 ## Why This Project?
 
-This experiment is meant to enhance an existing, successful, rules-based trading bot of mine with RL and NN features. This is part of my portfolio to demonstrate **end-to-end applied machine learning** in a real financial setting. It combines:
+This experiment is meant to enhance an existing, successful, rules-based trading bot of mine with RL and NN features. It is also part of my portfolio to demonstrate **end-to-end applied machine learning** in a real financial setting. It combines:
 
 - Low-latency live data ingestion  
 - Feature engineering using technical indicators  

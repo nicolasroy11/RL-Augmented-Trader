@@ -3,7 +3,7 @@ import logging
 db_logger = logging.getLogger('db')
 
 
-def Http(path: str, http_method: str, request_payload_type=None, return_type=None, query_params_type=None, description='No description', summary='No summary', group="General", include_in_swagger=False):
+def View(path: str, http_method: str, request_payload_type=None, return_type=None, query_params_type=None, description='No description', summary='No summary', group="General", include_in_swagger=False):
     """Sets view method attributes for use in various automations
         see https://stackoverflow.com/questions/338101/python-function-attributes-uses-and-abuses
         search: @with_attrs(counter=0, something='boing')

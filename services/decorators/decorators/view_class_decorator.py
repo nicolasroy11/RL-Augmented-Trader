@@ -1,7 +1,7 @@
 from functools import wraps
 
 
-def View(url: str):
+def ViewClass(url: str):
 
     def attr_decorator(_class):
         @wraps(_class)

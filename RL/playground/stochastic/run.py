@@ -1,7 +1,8 @@
+from typing import List
 import matplotlib.pyplot as plt
 import random
 import numpy as np
-from RL.playground.stochastic.policy import FeedForwardNN
+from RL.playground.stochastic.policy_gradient import FeedForwardNN
 from RL.playground.stochastic.env import TradingEnvWithPnL
 import torch
 import torch.optim as optim
@@ -63,36 +64,36 @@ def run_policy_gradient(db_path, window_size=10, num_episodes=20, gamma=0.99, lr
 
     optimizer = optim.Adam(policy.parameters(), lr=lr)
 
-    all_episode_pnls = []
+    all_episode_pnls: List[List[float]] = []
 
     for ep in range(num_episodes):
         # New environment per episode
-        env = TradingEnvWithPnL(db_path, window_size=window_size)
-        obs = env.normalized_reset()
+        env = TradingEnvWithPnL(db_path=db_path, window_size=window_size)
+        current_env_state = env.normalized_reset()
         done = False
 
-        log_probs = []
-        rewards = []
-        cumulative_pnl = 0.0
-        episode_pnls = []
+        log_probs: List[torch.Tensor] = []
+        rewards: List[float] = []
+        cumulative_pnl: float = 0.0
+        episode_pnls: List[float] = []
 
         print(f"Starting Episode {ep + 1}")
 
         while not done:
             # Flatten observation
-            state = torch.tensor(obs, dtype=torch.float32).flatten().unsqueeze(0)  # shape: (1, input_dim)
-            action_probs = policy(state)
-            dist = torch.distributions.Categorical(action_probs)
+            state = torch.tensor(data=current_env_state, dtype=torch.float32).flatten().unsqueeze(0)  # shape: (1, input_dim)
+            action_probabilities = policy(state)
+            dist = torch.distributions.Categorical(probs=action_probabilities)
             action = dist.sample()
-            log_prob = dist.log_prob(action)
+            log_prob: torch.Tensor = dist.log_prob(action)
 
-            obs, reward, done, info = env.step(action.item() - 1)  # map 0,1,2 → -1,0,1
+            current_env_state, reward, done, info = env.step(action.item() - 1)  # map 0,1,2 → -1,0,1
 
             log_probs.append(log_prob)
             rewards.append(reward)
 
             cumulative_pnl += reward
-            print("action probs:", action_probs.detach().numpy(), "\tcumulative_pnl: ", cumulative_pnl, f'\tepisode # {ep}')
+            print("action probs:", action_probabilities.detach().numpy(), "\tcumulative_pnl: ", cumulative_pnl, f'\tepisode # {ep}')
             episode_pnls.append(cumulative_pnl)
 
         # Compute discounted returns
@@ -118,8 +119,11 @@ def run_policy_gradient(db_path, window_size=10, num_episodes=20, gamma=0.99, lr
 
     # Plot results
     plt.figure(figsize=(12, 6))
-    for i, ep_pnl in enumerate(all_episode_pnls):
-        plt.plot(range(len(ep_pnl)), ep_pnl, label=f"Episode {i+1}")
+    # for i, ep_pnl in enumerate(all_episode_pnls):
+    #     plt.plot(range(len(ep_pnl)), ep_pnl, label=f"Episode {i+1}")
+    for i, episode_pnl in enumerate(all_episode_pnls):
+        if i in [0, 50, len(episode_pnl)]:
+            plt.plot(range(len(episode_pnl)), episode_pnl, label=f"Episode {i+1}")
     plt.xlabel("Step within Episode")
     plt.ylabel("Cumulative PnL")
     plt.title("PnL Progression Across Episodes (Policy Gradient)")

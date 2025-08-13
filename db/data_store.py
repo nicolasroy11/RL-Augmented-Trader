@@ -4,7 +4,7 @@ import duckdb
 from datetime import datetime, timezone
 import time
 import pandas as pd
-from db.settings import DB_FILE_PATH, SYMBOL
+from db.settings import DUCKDB_FILE_PATH, SYMBOL
 from helpers import add_bollinger_bands, add_ema, add_macd, add_rsi, connection_is_good, get_latest_candles
 
 
@@ -163,6 +163,6 @@ class DataStore:
 
 
 if __name__ == "__main__":
-    datastore = DataStore(DB_FILE_PATH, readonly=False)
+    datastore = DataStore(DUCKDB_FILE_PATH, readonly=False)
     datastore.create_table()
     datastore.continuous_poll_and_store()

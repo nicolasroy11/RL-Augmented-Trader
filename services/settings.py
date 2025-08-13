@@ -14,7 +14,7 @@ from pathlib import Path
 import db.settings as db_settings
 
 
-DUCKDB_FILE_PATH = db_settings.DB_FILE_PATH
+DUCKDB_FILE_PATH = db_settings.DUCKDB_FILE_PATH
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

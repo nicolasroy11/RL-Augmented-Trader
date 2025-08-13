@@ -58,6 +58,10 @@ The contents of this repository will be an exploration of ways to better size lo
 
 The concept is rather simple: take in a time window of recent market observations, feed them to a neural network and output the probablities for three states: buy, sell, or hold. The buy probability can then be used directly on the lot calculation, leading to larger long-term gains.
 
+So far, the preliminary tests appear promising on a down trend over 50 episodes:
+
+![alt text](image.png)
+
 
 ## This Repository
 

@@ -258,9 +258,10 @@ def run_multi_file_policy_gradient(folder_path, window_size=10, num_episodes=20,
 
 
 if __name__ == "__main__":
-    # Customize these
+
+    # TODO: Make these proportional to the size of training data
     window_size = 150
-    num_episodes = 50
+    num_episodes = 100
     
     # print("\n=== Running pure random baseline ===\n")
     # run_stochastic_episodes(db_path, window_size, num_episodes)

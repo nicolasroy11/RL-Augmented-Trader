@@ -52,5 +52,5 @@ for i, method in grids_method_list:
         view = swagger_view
 
     # we ignore the methods that do not have the http_method, which is
-    # only present for those decorated with the custom @Http decorator
+    # only present for those decorated with the custom @View decorator
     urlpatterns.append(path(Ticks.url + method.path, view))

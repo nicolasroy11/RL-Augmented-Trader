@@ -60,7 +60,13 @@ The concept is rather simple: take in a time window of recent market observation
 
 So far, the preliminary tests appear promising on a down trend over 50 episodes:
 
-![alt text](image.png)
+<!-- <div style="display: inline"> -->
+<img style="display: block; margin: 0 auto;" src="static/PnL_over_50_episodes_downtrend.png" width=50% />
+</br>
+trained over the following price action:
+</br>
+<img style="display: block; margin: 0 auto;" src="static/price_downtrend.png" width=50% />
+<!-- </div> -->
 
 
 ## This Repository

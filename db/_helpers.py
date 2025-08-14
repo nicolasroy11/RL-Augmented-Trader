@@ -2,7 +2,7 @@ from typing import List
 import duckdb
 import os
 
-from db.settings import DUCKDB_ARCHIVES_PATH
+from db.settings import DUCKDB_ARCHIVES_PATH, TICKS_TABLE_NAME
 
 def get_valid_duckdb_files(folder_path: str, window_size: int, min_amount_of_windows_in_file: int = 10) -> List[str]:
     
@@ -20,10 +20,10 @@ def get_valid_duckdb_files(folder_path: str, window_size: int, min_amount_of_win
                 table_names = [t[0] for t in tables]
 
                 if "ticks" not in table_names:
-                    print(f"[WARN] Skipping {file} — no table named 'ticks'. Found: {table_names}")
+                    print(f"[WARN] Skipping {file} — no table named '{TICKS_TABLE_NAME}'. Found: {table_names}")
                     continue
 
-                length = con.execute("SELECT COUNT(*) FROM ticks").fetchone()[0]
+                length = con.execute(f"SELECT COUNT(*) FROM {TICKS_TABLE_NAME}").fetchone()[0]
 
             except Exception as e:
                 print(f"[ERROR] Could not read {file}: {e}")
@@ -54,11 +54,9 @@ def get_all_duckdb_archive_files() -> List[str]:
                 tables = con.execute("SHOW TABLES").fetchall()
                 table_names = [t[0] for t in tables]
 
-                if "ticks" not in table_names:
-                    print(f"[WARN] Skipping {file} — no table named 'ticks'. Found: {table_names}")
+                if TICKS_TABLE_NAME not in table_names:
+                    print(f"[WARN] Skipping {file} — no table named '{TICKS_TABLE_NAME}'. Found: {table_names}")
                     continue
-
-                length = con.execute("SELECT COUNT(*) FROM ticks").fetchone()[0]
 
             except Exception as e:
                 print(f"[ERROR] Could not read {file}: {e}")

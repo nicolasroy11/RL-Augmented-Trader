@@ -4,7 +4,7 @@ import duckdb
 from datetime import datetime, timezone
 import time
 import pandas as pd
-from db.settings import DUCKDB_FILE_PATH, SYMBOL
+from db.settings import DUCKDB_FILE_PATH, SYMBOL, TICKS_TABLE_NAME
 from helpers import add_bollinger_bands, add_ema, add_macd, add_rsi, connection_is_good, get_latest_candles
 
 
@@ -41,8 +41,8 @@ class DataStore:
 
 
     def create_table(self):
-        self.con.execute("""
-            CREATE TABLE IF NOT EXISTS ticks (
+        self.con.execute(f"""
+            CREATE TABLE IF NOT EXISTS {TICKS_TABLE_NAME} (
                 timestamp TIMESTAMP,
                 price DOUBLE,
                 rsi_5 DOUBLE,
@@ -66,15 +66,15 @@ class DataStore:
 
 
     def insert_tick_data(self, tick: Tick):
-        self.con.execute("""
-            INSERT INTO ticks (timestamp, price, rsi_5, rsi_7, rsi_12, ema_short, ema_mid, ema_long, ema_xlong, macd_line, macd_hist, macd_signal, bb_upper, bb_middle, bb_lower, bb_width, percent_b, z_bb)
+        self.con.execute(f"""
+            INSERT INTO {TICKS_TABLE_NAME} (timestamp, price, rsi_5, rsi_7, rsi_12, ema_short, ema_mid, ema_long, ema_xlong, macd_line, macd_hist, macd_signal, bb_upper, bb_middle, bb_lower, bb_width, percent_b, z_bb)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (tick.timestamp, tick.price, tick.rsi_5, tick.rsi_7, tick.rsi_12, tick.ema_short, tick.ema_mid, tick.ema_long, tick.ema_xlong, tick.macd_line, tick.macd_hist, tick.macd_signal, tick.bb_upper, tick.bb_middle, tick.bb_lower, tick.bb_width, tick.percent_b, tick.z_bb))
 
 
     def insert_empty_tick_data(self, timestamp: datetime):
-        self.con.execute("""
-            INSERT INTO ticks (timestamp, price, rsi_5, rsi_7, rsi_12, ema_short, ema_mid, ema_long, ema_xlong, macd_line, macd_hist, macd_signal, bb_upper, bb_middle, bb_lower, bb_width, percent_b, z_bb)
+        self.con.execute(f"""
+            INSERT INTO {TICKS_TABLE_NAME} (timestamp, price, rsi_5, rsi_7, rsi_12, ema_short, ema_mid, ema_long, ema_xlong, macd_line, macd_hist, macd_signal, bb_upper, bb_middle, bb_lower, bb_width, percent_b, z_bb)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (timestamp, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None))
 
@@ -148,17 +148,17 @@ class DataStore:
     
     
     def test_print(self):
-        df = self.con.execute("SELECT * FROM ticks ORDER BY timestamp DESC LIMIT 10").fetchdf()
+        df = self.con.execute(f"SELECT * FROM {TICKS_TABLE_NAME} ORDER BY timestamp DESC LIMIT 10").fetchdf()
         print(df)
 
 
     def get_recent_tick_data(self, num_ticks: int = 10):
-        df = self.con.execute(f"SELECT * FROM ticks ORDER BY timestamp DESC LIMIT {num_ticks}").fetchdf()
+        df = self.con.execute(f"SELECT * FROM {TICKS_TABLE_NAME} ORDER BY timestamp DESC LIMIT {num_ticks}").fetchdf()
         return df
 
 
     def get_all_tick_data(self):
-        df = self.con.execute("SELECT * FROM ticks ORDER BY timestamp ASC").fetchdf()
+        df = self.con.execute(f"SELECT * FROM {TICKS_TABLE_NAME} ORDER BY timestamp ASC").fetchdf()
         return df
 
 

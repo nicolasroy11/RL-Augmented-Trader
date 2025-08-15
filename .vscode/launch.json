@@ -21,7 +21,8 @@
             "request": "launch",
             "program": "${workspaceFolder}/services/manage.py",
             "args": [
-                "runserver"
+                "runserver",
+                "--noreload"
             ],
             "env": {
                 "PYTHONPATH": "."

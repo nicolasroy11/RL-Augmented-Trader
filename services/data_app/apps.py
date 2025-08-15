@@ -1,8 +1,6 @@
 from django.apps import AppConfig
 import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
-from db.data_store import DataStore
-from django.conf import settings
 
 
 class DataApp(AppConfig):

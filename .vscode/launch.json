@@ -21,9 +21,47 @@
             "request": "launch",
             "program": "${workspaceFolder}/services/manage.py",
             "args": [
-                "runserver",
-                "--noreload",
-                "localhost:3000"
+                "runserver"
+            ],
+            "env": {
+                "PYTHONPATH": "."
+            },
+            "django": true
+        },
+        {
+            "name": "Django Tests",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/services/manage.py",
+            "args": [
+                "test",
+                "services.data_app"
+            ],
+            "env": {
+                "PYTHONPATH": "."
+            },
+            "django": true
+        },
+        {
+            "name": "Django Makemigrations",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/services/manage.py",
+            "args": [
+                "makemigrations"
+            ],
+            "env": {
+                "PYTHONPATH": "."
+            },
+            "django": true
+        },
+        {
+            "name": "Django Migrate",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/services/manage.py",
+            "args": [
+                "migrate"
             ],
             "env": {
                 "PYTHONPATH": "."

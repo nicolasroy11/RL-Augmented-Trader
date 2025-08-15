@@ -11,10 +11,14 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+from db.data_store import DataStore
 import db.settings as db_settings
 
 
-DUCKDB_FILE_PATH = db_settings.DUCKDB_FILE_PATH
+DUCKDB_FILE_PATH = db_settings.DUCKDB_ARCHIVES_PATH + '/08122025_large_ticks.duckdb'
+
+READ_ONLY_DUCKDB_CONN = DataStore(db_path=DUCKDB_FILE_PATH, readonly=True)
+# WRITE_DUCKDB_CONN = DataStore(db_path=DUCKDB_FILE_PATH, readonly=False)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -40,10 +44,10 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
-    "django.contrib.staticfiles"
+    "django.contrib.staticfiles",
 ]
 
-INSTALLED_APPS.append("services.data_app.apps.DataApp")
+INSTALLED_APPS.append("data_app.apps.DataApp")
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -76,15 +80,20 @@ TEMPLATES = [
 WSGI_APPLICATION = "wsgi.application"
 
 
-# Database
-# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'rlat',                 # Database name
+        'USER': 'postgres',              # Database user
+        'PASSWORD': 'postgres',          # Database password
+        'HOST': '127.0.0.1',              # Docker service name
+        'PORT': '5432',                  # Default Postgres port
+        'OPTIONS': {
+            'options': '-c search_path=public,duckdb_transfers'  # Default schema
+        }
+    }
+}
 
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.sqlite3",
-#         "NAME": BASE_DIR / "db.sqlite3",
-#     }
-# }
 
 
 # Password validation

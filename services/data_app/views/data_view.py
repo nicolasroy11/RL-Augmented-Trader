@@ -1,10 +1,10 @@
 from django.core.handlers.wsgi import WSGIRequest
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from services.data_app.dtos.tick_dto import TickDto
 from services.decorators.decorators.view_decorator import View
 from services.decorators.decorators.view_class_decorator import ViewClass
-from services.data_app.apps import data_store
-
+from services.data_app.repositories.data_repository import DataRepository
+data_repo = DataRepository()
 
 
 @ViewClass(
@@ -16,6 +16,7 @@ class Ticks:
         app_label = 'services.data_app'
         label = 'ticks'
 
+
     @View(
         path='get_all_ticks',
         http_method='GET',
@@ -24,8 +25,22 @@ class Ticks:
     )
     def get_all(req: WSGIRequest):
         def exec():
-            ticks = data_store.get_all_tick_data().to_dict(orient='records')
+            ticks = data_repo.get_ticks_from_duckdb()
             print(f"Fetched {len(ticks)} ticks from the database. Approximately {len(ticks) * 5 / 60:.2f} minutes of data.")
+            dto = TickDto.Serializer(ticks, many=True).data
+            return JsonResponse(dto, safe=False)
+        return exec()
+    
+
+    @View(
+        path='save_archives_to_pg',
+        http_method='GET',
+        return_type=TickDto.Serializer(many=True),
+        description='Get all ticks'
+    )
+    def save_archives_to_pg(req: WSGIRequest):
+        def exec():
+            ticks = data_repo.save_ticks_to_pg()
             dto = TickDto.Serializer(ticks, many=True).data
             return JsonResponse(dto, safe=False)
         return exec()

@@ -26,7 +26,7 @@ Contact: nicolasroy11@gmail.com
 ## Features
 
 ✅ Real-time 5s data ingestion from Binance  
-✅ DuckDB-based tick storage for fast analytics  
+✅ Postgres and DuckDB-based tick storage for fast analytics  
 ✅ Custom PyTorch RL agent (Policy Gradient)  
 ✅ Live environment with simulated trading logic  
 ✅ Normalized technical indicators: RSI, EMA, MACD, Bollinger bands  

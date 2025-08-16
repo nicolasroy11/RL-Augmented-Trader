@@ -68,3 +68,5 @@ class DataRepositoryTests(TestCase):
     ):
         self.repo.single_poll_and_store()
         mock_insert_empty.assert_called_once()
+
+    # TODO: Add test to ensure same time stamp is not inserted twice

@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
 
 from django.test import TestCase
-from services.data_app.models import BTCFDUSDData
+from services.core.models import BTCFDUSDData
 from services.data_app.repositories.data_repository import DataRepository
 
 

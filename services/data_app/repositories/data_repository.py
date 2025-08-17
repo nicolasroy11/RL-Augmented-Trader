@@ -5,7 +5,7 @@ import pandas as pd
 from db.data_store import Tick
 from db.settings import SYMBOL
 from helpers import add_bollinger_bands, add_ema, add_macd, add_rsi, connection_is_good, get_latest_candles
-from services.data_app.models import BTCFDUSDData, BTCFDUSDTick
+from services.core.models import BTCFDUSDData, BTCFDUSDTick
 from db.data_store import DataStore
 from django.conf import settings
 from binance.client import Client

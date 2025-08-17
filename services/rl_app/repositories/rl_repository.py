@@ -14,7 +14,8 @@ import torch
 import torch.optim as optim
 from django.db.models.query import QuerySet
 
-from services.rl_app.environments.stochastic_single_buy_sell import StochasticSingleBuy
+from services.core.dtos.policy_gradient_results import PolicyGradientResults
+from services.rl_app.environments.stochastic_single_buy import StochasticSingleBuy
 
 TICKS_TABLE_NAME = BTCFDUSDTick._meta.db_table
 DATA_TABLE_NAME = BTCFDUSDData._meta.db_table
@@ -27,14 +28,14 @@ class RLRepository():
     def run_policy_gradient(self, window_size=150, num_episodes=100, gamma=0.95, lr=1e-3):
         """
         Train a policy gradient agent across multiple discontinuous market datasets (pgsql data chunks).
-        PnL is continuous across all files in a single episode.
+        PnL is continuous across all data chunks in a single episode.
         """
 
-        # STEP 1 — Gather all valid DuckDB files
+        # STEP 1 — Gather all valid data chunks
         queryset = BTCFDUSDData.objects.order_by('timestamp').all()
         data_chunks = self.get_valid_data_chunks(queryset, window_size=window_size, min_windows=10)
         if not data_chunks:
-            raise ValueError("No valid chunks files found with enough rows.")
+            raise ValueError("No valid chunks found with enough rows.")
 
         # STEP 2 — Initialize dummy env to determine observation dimension (num of features)
         dummy_env = StochasticSingleBuy(data=data_chunks[0], window_size=window_size)
@@ -46,31 +47,32 @@ class RLRepository():
         optimizer = optim.Adam(policy.parameters(), lr=lr)
 
         all_episode_pnls = []  # Stores cumulative PnL curves for plotting
+        final_episode_pnls = []
 
         # STEP 4 — Main training loop
-        for episode_number in range(num_episodes):
-            print(f"\n=== Starting Episode {episode_number + 1} ===")
-            random.shuffle(data_chunks)  # Shuffle file order to avoid memorization
+        for episode_number in range(num_episodes - 1):
+            print(f"\n=== Starting Episode {episode_number} ===")
+            random.shuffle(data_chunks)  # Shuffle chunk order to avoid memorization
 
             log_probs = []
             rewards = []
-            cumulative_pnl = 0.0   # Continuous PnL across all files in this episode
+            cumulative_pnl = 0.0   # Continuous PnL across all chunks in this episode
             episode_pnls = []
 
-            # STEP 5 — Loop through each file
+            # STEP 5 — Loop through each chunk
             for chunk in data_chunks:
 
-                # Initialize environment for this file
+                # Initialize environment for this chunk
                 env = StochasticSingleBuy(chunk, window_size=window_size)
 
                 # Reset env but preserve current cumulative PnL
                 current_env_state = env.normalized_reset()
                 done = False
 
-                file_log_probs = []
-                file_rewards = []
+                chunk_log_probs = []
+                chunk_rewards = []
 
-                # STEP 5a — Interact with environment until this file is done
+                # STEP 5a — Interact with environment until this chunk is done
                 while not done:
                     # Convert observation to tensor and flatten
                     state = torch.tensor(current_env_state, dtype=torch.float32).flatten().unsqueeze(0)
@@ -84,9 +86,9 @@ class RLRepository():
                     # Step environment (actions: -1,0,1)
                     current_env_state, reward, done, info = env.step(action.item() - 1)
 
-                    # Track file-specific and episode-wide metrics
-                    file_log_probs.append(log_prob)
-                    file_rewards.append(reward)
+                    # Track chunk-specific and episode-wide metrics
+                    chunk_log_probs.append(log_prob)
+                    chunk_rewards.append(reward)
 
                     cumulative_pnl += reward
                     episode_pnls.append(cumulative_pnl)
@@ -98,13 +100,13 @@ class RLRepository():
                     )
 
                 # STEP 5b — Normalize rewards for stability
-                file_rewards = torch.tensor(file_rewards, dtype=torch.float32)
-                if file_rewards.std() > 0:
-                    file_rewards = (file_rewards - file_rewards.mean()) / (file_rewards.std() + 1e-9)
+                chunk_rewards = torch.tensor(chunk_rewards, dtype=torch.float32)
+                if chunk_rewards.std() > 0:
+                    chunk_rewards = (chunk_rewards - chunk_rewards.mean()) / (chunk_rewards.std() + 1e-9)
 
                 # Append normalized rewards and log_probs to episode-level lists
-                rewards.extend(file_rewards.tolist())
-                log_probs.extend(file_log_probs)
+                rewards.extend(chunk_rewards.tolist())
+                log_probs.extend(chunk_log_probs)
 
             # STEP 6 — Compute discounted returns for the full episode
             returns = []
@@ -125,7 +127,13 @@ class RLRepository():
             optimizer.step()
 
             all_episode_pnls.append(episode_pnls)
+            final_episode_pnls.append(episode_pnls[-1])  # store final PnL
             print(f"Episode {episode_number} finished. Total PnL: {cumulative_pnl:.2f}")
+
+        # Save trained policy
+        model_path = "trained_policy.pth"
+        torch.save(policy.state_dict(), model_path)
+        print(f"Trained policy saved to {model_path}")
 
         # STEP 8 — Plot cumulative PnL curves
         plt.figure(figsize=(12, 6))
@@ -134,12 +142,11 @@ class RLRepository():
         for i, episode_pnl in enumerate(all_episode_pnls):
             if i in [0, int(np.floor(len(all_episode_pnls)/2)), len(all_episode_pnls) - 1]:
                 plt.plot(range(len(episode_pnl)), episode_pnl, label=f"Episode {i}")
-        plt.xlabel("Step within Episode")
-        plt.ylabel("Cumulative PnL")
-        plt.title("PnL Progression Across Episodes (Multi-file Policy Gradient)")
-        plt.legend()
-        plt.show()
-        t = 0
+
+        results = PolicyGradientResults()
+        results.all_episode_final_pnls = final_episode_pnls
+
+        return results
 
 
     def get_valid_data_chunks(self, queryset: QuerySet[BTCFDUSDData], window_size: int, min_windows: int = 10) -> List[pd.DataFrame]:

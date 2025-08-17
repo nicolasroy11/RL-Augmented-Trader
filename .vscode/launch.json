@@ -16,7 +16,7 @@
             }
         },
         {
-            "name": "Data Service: Run (Django)",
+            "name": "Run RL Project: Run (Django)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/services/manage.py",

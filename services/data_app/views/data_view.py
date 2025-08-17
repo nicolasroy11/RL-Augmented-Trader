@@ -1,6 +1,6 @@
 from django.core.handlers.wsgi import WSGIRequest
-from django.http import HttpResponse, JsonResponse
-from services.data_app.dtos.tick_dto import TickDto
+from django.http import JsonResponse
+from services.core.dtos.tick_dto import TickDto
 from services.decorators.decorators.view_decorator import View
 from services.decorators.decorators.view_class_decorator import ViewClass
 from services.data_app.repositories.data_repository import DataRepository

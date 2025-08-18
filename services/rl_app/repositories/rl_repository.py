@@ -1,12 +1,10 @@
+from datetime import datetime, timezone
 from typing import List
-
 import pandas as pd
 from RL.playground.stochastic.policy_gradient import FeedForwardNN
 from services.core.models import BTCFDUSDData, BTCFDUSDTick
-from binance.client import Client
 
 from typing import List
-import matplotlib.pyplot as plt
 import random
 import numpy as np
 from RL.playground.stochastic.policy_gradient import FeedForwardNN
@@ -14,18 +12,16 @@ import torch
 import torch.optim as optim
 from django.db.models.query import QuerySet
 
-from services.core.dtos.policy_gradient_results import PolicyGradientResults
+from services.core.dtos.policy_gradient_results_dto import PolicyGradientResultsDto
 from services.rl_app.environments.stochastic_single_buy import StochasticSingleBuy
 
 TICKS_TABLE_NAME = BTCFDUSDTick._meta.db_table
 DATA_TABLE_NAME = BTCFDUSDData._meta.db_table
-client = Client(tld='com')
-store_frequency_secs = 5
 
 
 class RLRepository():
 
-    def run_policy_gradient(self, window_size=150, num_episodes=100, gamma=0.95, lr=1e-3):
+    def run_policy_gradient(self, window_size=150, num_episodes=100, gamma=0.95, lr=1e-3) -> PolicyGradientResultsDto:
         """
         Train a policy gradient agent across multiple discontinuous market datasets (pgsql data chunks).
         PnL is continuous across all data chunks in a single episode.
@@ -131,19 +127,11 @@ class RLRepository():
             print(f"Episode {episode_number} finished. Total PnL: {cumulative_pnl:.2f}")
 
         # Save trained policy
-        model_path = "trained_policy.pth"
+        model_path = f"pth_files/trained_policy_{datetime.now(tz=timezone.utc)}.pth"
         torch.save(policy.state_dict(), model_path)
         print(f"Trained policy saved to {model_path}")
 
-        # STEP 8 — Plot cumulative PnL curves
-        plt.figure(figsize=(12, 6))
-        # for i, ep_pnl in enumerate(all_episode_pnls):
-        #     plt.plot(range(len(ep_pnl)), ep_pnl, label=f"Episode {i+1}")
-        for i, episode_pnl in enumerate(all_episode_pnls):
-            if i in [0, int(np.floor(len(all_episode_pnls)/2)), len(all_episode_pnls) - 1]:
-                plt.plot(range(len(episode_pnl)), episode_pnl, label=f"Episode {i}")
-
-        results = PolicyGradientResults()
+        results = PolicyGradientResultsDto()
         results.all_episode_final_pnls = final_episode_pnls
 
         return results

@@ -122,13 +122,15 @@ class DataRepository():
     
 
     def single_poll_and_store(self):
+        n = 0
         if connection_is_good(client=client, wait_until_true=False):
             try:
                 tick = self.get_tick_data()
                 self.insert_tick_data(tick)
-                print(f'stored: {tick.timestamp}')
+                print(f'stored tick {n}: {tick.timestamp} - {tick.price}')
             except BaseException as e:
                 now = datetime.now(timezone.utc)
+                print(f'stored tick {n}: {tick.timestamp} - {e}')
                 self.insert_empty_tick_data(timestamp=now)
         else:
             now = datetime.now(timezone.utc)

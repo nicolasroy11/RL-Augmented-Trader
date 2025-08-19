@@ -27,9 +27,23 @@ class RLViews:
     )
     def run_policy_gradient(req: WSGIRequest):
         def exec():
-            results = rl_repo.run_policy_gradient(window_size=150, num_episodes=10)
+            results = rl_repo.run_policy_gradient(window_size=150, num_episodes=100)
             dto = PolicyGradientResultsDto.Serializer(results).data
             return JsonResponse(dto)
         return exec()
-    
+
+
+    @View(
+        path='run_ppo',
+        http_method='GET',
+        return_type=PolicyGradientResultsDto.Serializer(),
+        description='Run policy gradient algorithm and return results',
+        include_in_swagger=True
+    )
+    def run_ppo(req: WSGIRequest):
+        def exec():
+            results = rl_repo.run_ppo(window_size=150, num_episodes=100)
+            dto = PolicyGradientResultsDto.Serializer(results).data
+            return JsonResponse(dto)
+        return exec()
     

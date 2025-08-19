@@ -4,8 +4,31 @@ from services.decorators.decorators.dto_class_decorator import Dto
 
 
 @Dto()
-class PolicyGradientResultsDto():
-    all_episode_final_pnls: List[float]
+class EpisodeResultsDto:
+    episode_number: int
+    final_pnl: float
+    episode_pnls: List[float]
+    running_max: List[float]
+    drawdowns: List[float]
+    max_drawdown: float
+    buy_and_hold_pnl: float
+    sharpe_ratio: float
+
     class Serializer(serializers.Serializer):
-        all_episode_final_pnls = serializers.ListField(child=serializers.FloatField())
-        # buy_and_hold_pnl = serializers.FloatField()
+        episode_number = serializers.IntegerField()
+        final_pnl = serializers.FloatField()
+        episode_pnls = serializers.ListField(child=serializers.FloatField())
+        running_max = serializers.ListField(child=serializers.FloatField())
+        drawdowns = serializers.ListField(child=serializers.FloatField())
+        max_drawdown = serializers.FloatField()
+        buy_and_hold_pnl = serializers.FloatField()
+        sharpe_ratio = serializers.FloatField()
+
+
+@Dto()
+class PolicyGradientResultsDto():
+    episode_results: List[EpisodeResultsDto]
+
+    class Serializer(serializers.Serializer):
+        episode_results = serializers.ListField(child=EpisodeResultsDto.Serializer())
+

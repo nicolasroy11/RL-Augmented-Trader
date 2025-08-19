@@ -47,7 +47,7 @@ class TradersConfig(AppConfig):
         HISTORY_WINDOW_LENGTH = 150
         DECISION_MODE = "argmax"
         POLICY_PATH = runtime_settings.RL_POLICY_PATH
-        MAX_BUY_QUANTITY = 0.01  # Adjust based on your trading strategy
+        MAX_BUY_QUANTITY = 0.01
 
         # ------------------------------
         # Binance client

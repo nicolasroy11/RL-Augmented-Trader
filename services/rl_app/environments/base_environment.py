@@ -1,3 +1,4 @@
+from typing import List
 import numpy as np
 import pandas as pd
 from services.core.models import BTCFDUSDData
@@ -12,9 +13,24 @@ class BaseTradingEnvironment:
         self.entry_price: float = None
 
     def load_data(self):
+        ticks = self.get_ordered_ticks()
+        df = self.to_env_dataframe(ticks)
+        return df
+    
+    # def load_data(self):
+    #     ticks = BTCFDUSDData.objects.all().order_by("timestamp").values()
+    #     df = pd.DataFrame.from_records(ticks)
+    #     return df.reset_index(drop=True)
+    
+    def get_ordered_ticks(self):
         ticks = BTCFDUSDData.objects.all().order_by("timestamp").values()
-        df = pd.DataFrame.from_records(ticks)
-        return df.reset_index(drop=True)
+        return ticks
+    
+    @staticmethod
+    def to_env_dataframe(ticks: List[BTCFDUSDData]) -> pd.DataFrame:
+        ticks_df = pd.DataFrame.from_records([t.__dict__ for t in ticks])
+        ticks_df = ticks_df.drop(columns=["_state"], errors="ignore")
+        return ticks_df.reset_index(drop=True)
 
     def reset(self):
         self.current_step = self.window_size
@@ -24,7 +40,7 @@ class BaseTradingEnvironment:
         window = self.data.iloc[self.current_step - self.window_size : self.current_step]
         return window.drop(columns=["id", "timestamp"]).to_numpy()
 
-    def _get_normalized_observation(self):
+    def get_normalized_observation(self):
         obs_df = self.data.iloc[self.current_step - self.window_size : self.current_step].copy()
 
         # === Latest prices & indicators ===
@@ -85,7 +101,7 @@ class BaseTradingEnvironment:
 
     def normalized_reset(self):
         self.current_step = self.window_size
-        return self._get_normalized_observation()
+        return self.get_normalized_observation()
 
     def step(self, action):
         self.current_step += 1

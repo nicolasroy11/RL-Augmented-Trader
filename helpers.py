@@ -3,7 +3,7 @@ from datetime import datetime
 import math
 import time
 from typing import Any, List
-from classes import BidAskReport, LoopReport, OrderReport, OrderSide, OrderType, SymbolParams, TradeCycleReport
+from classes import Balances, BidAskReport, LoopReport, OrderReport, OrderSide, OrderType, SymbolParams, TradeCycleReport
 from binance import Client
 import numpy as np
 import pandas as pd
@@ -948,6 +948,27 @@ def add_bollinger_bands(df: pd.DataFrame, length: int = 20, std_dev: float = 2.0
     df['percent_b'] = (df['Close'] - df['bb_lower']) / (df['bb_width'].replace({0: np.nan}))
     df['z_bb'] = (df['Close'] - df['bb_middle']) / (std.replace({0: np.nan}))
     return df
+
+
+def get_balances_snapshot(client: Client, quote_asset: str, base_asset: str) -> Balances:
+    whole_wallet = client.get_account()
+    all_balances_dict = {balance['asset']: balance for balance in whole_wallet['balances'] if balance['asset'] == base_asset or balance['asset'] == quote_asset}
+    free_quote_balance = float(all_balances_dict[quote_asset]['free'])
+    locked_quote_balance = float(all_balances_dict[quote_asset]['locked'])
+    free_base_balance = float(all_balances_dict[base_asset]['free'])
+    locked_base_balance = float(all_balances_dict[base_asset]['locked'])
+    b = Balances(free_base_balance=free_base_balance, locked_base_balance=locked_base_balance, free_quote_balance=free_quote_balance, locked_quote_balance=locked_quote_balance)
+    return b
+
+
+def get_instant_notional_minimum(client: Client, symbol: str, price: float) -> float:
+    symbol_filter_dict = {filter['filterType']: filter for filter in client.get_symbol_info(symbol=symbol)['filters']}
+    if 'MIN_NOTIONAL' in symbol_filter_dict:
+            notional_key = 'MIN_NOTIONAL' 
+    else: 
+        notional_key = 'NOTIONAL'
+    notional_minimum = float(symbol_filter_dict[notional_key]['minNotional'])/price
+    return notional_minimum
 
 
 def connection_is_good(client: Client, wait_until_true = True) -> bool:

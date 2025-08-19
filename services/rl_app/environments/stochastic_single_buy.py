@@ -53,7 +53,7 @@ class StochasticSingleBuy(BaseTradingEnvironment):
         done = self.current_step >= len(self.data)
 
         # === Get next observation ===
-        obs = self._get_normalized_observation() if not done else None
+        obs = self.get_normalized_observation() if not done else None
 
         # === Reward: realized PnL only ===
         reward = realized_pnl

@@ -5,16 +5,22 @@ import pandas as pd
 from db.data_store import Tick
 from db.settings import SYMBOL
 from helpers import add_bollinger_bands, add_ema, add_macd, add_rsi, connection_is_good, get_latest_candles
+import runtime_settings
 from services.core.models import BTCFDUSDData, BTCFDUSDTick
 from db.data_store import DataStore
 from django.conf import settings
 from binance.client import Client
 
+client = runtime_settings.read_only_client
 
 data_store: DataStore = settings.READ_ONLY_DUCKDB_CONN
 TICKS_TABLE_NAME = BTCFDUSDTick._meta.db_table
 DATA_TABLE_NAME = BTCFDUSDData._meta.db_table
-client = Client(tld='com')
+BASE_ASSET = runtime_settings.BASE_ASSET
+QUOTE_ASSET = runtime_settings.QUOTE_ASSET
+SYMBOL = f"{BASE_ASSET}{QUOTE_ASSET}"
+
+
 store_frequency_secs = 5
 
 
@@ -122,15 +128,14 @@ class DataRepository():
     
 
     def single_poll_and_store(self):
-        n = 0
         if connection_is_good(client=client, wait_until_true=False):
             try:
                 tick = self.get_tick_data()
                 self.insert_tick_data(tick)
-                print(f'stored tick {n}: {tick.timestamp} - {tick.price}')
+                print(f'stored tick: {tick.timestamp} - {tick.price}')
             except BaseException as e:
                 now = datetime.now(timezone.utc)
-                print(f'stored tick {n}: {tick.timestamp} - {e}')
+                print(f'stored tick: {tick.timestamp} - {e}')
                 self.insert_empty_tick_data(timestamp=now)
         else:
             now = datetime.now(timezone.utc)
@@ -156,6 +161,7 @@ class DataRepository():
             bb_lower=tick.bb_lower,
         )
 
+
     def insert_empty_tick_data(self, timestamp: datetime):
         BTCFDUSDData.objects.create(
             timestamp=timestamp,
@@ -174,3 +180,14 @@ class DataRepository():
             bb_middle=None,
             bb_lower=None
         )
+
+
+    def get_latest_tick_window_data(self, num_ticks: int) -> List[BTCFDUSDData]:
+        """
+        Fetch the last `num_ticks` tick data from the BTCFDUSDData table.
+        """
+        end_time = datetime.now(timezone.utc)
+        start_time = end_time - pd.Timedelta(seconds=num_ticks * store_frequency_secs)
+        ticks = BTCFDUSDData.objects.filter(timestamp__gte=start_time, timestamp__lte=end_time).order_by('timestamp')
+        return list(ticks)
+

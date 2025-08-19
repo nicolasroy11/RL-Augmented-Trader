@@ -4,6 +4,7 @@ from typing import List
 import pandas as pd
 from RL.playground.stochastic.actor_critic import ActorCritic
 from RL.playground.stochastic.policy_gradient import FeedForwardNN
+import runtime_settings
 from services.core.models import BTCFDUSDData, BTCFDUSDTick
 
 from typing import List
@@ -54,7 +55,7 @@ class Actions(Enum):
 
 class RLRepository:
 
-    def run_policy_gradient(self, window_size=150, num_episodes=100, gamma=0.95, lr=1e-3) -> PolicyGradientResultsDto:
+    def run_policy_gradient(self, window_size=runtime_settings.DATA_TICKS_WINDOW, num_episodes=100, gamma=0.95, lr=1e-3) -> PolicyGradientResultsDto:
         queryset = BTCFDUSDData.objects.order_by('timestamp').all()
         data_chunks = self.get_valid_data_chunks(queryset, window_size=window_size, min_windows=10)
         if not data_chunks:
@@ -167,7 +168,7 @@ class RLRepository:
         return results
     
 
-    def run_ppo(self, window_size=150, num_episodes=100, gamma=0.99, lr=3e-4, clip_epsilon=0.2, ppo_epochs=4, batch_size=64) -> PolicyGradientResultsDto:
+    def run_ppo(self, window_size=runtime_settings.DATA_TICKS_WINDOW, num_episodes=100, gamma=0.99, lr=3e-4, clip_epsilon=0.2, ppo_epochs=4, batch_size=64) -> PolicyGradientResultsDto:
         queryset = BTCFDUSDData.objects.order_by('timestamp').all()
         data_chunks = self.get_valid_data_chunks(queryset, window_size=window_size, min_windows=10)
         if not data_chunks:

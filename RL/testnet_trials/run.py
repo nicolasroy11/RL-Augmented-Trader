@@ -13,9 +13,12 @@ data_repo = DataRepository()
 # ------------------------------
 # Config
 # ------------------------------
-SYMBOL = "BTCUSDT"          # change as needed
-DATA_INTERVAL = 5           # seconds
-HISTORY_WINDOW = 150        # ticks for indicators
+
+BASE_ASSET = runtime_settings.BASE_ASSET
+QUOTE_ASSET = runtime_settings.QUOTE_ASSET
+SYMBOL = f"{BASE_ASSET}{QUOTE_ASSET}"
+DATA_FREQUENCY_SECS = runtime_settings.DATA_FREQUENCY_SECS
+HISTORY_WINDOW = runtime_settings.DATA_TICKS_WINDOW        # ticks for indicators
 
 API_KEY = runtime_settings.binance_api_key
 API_SECRET = runtime_settings.binance_secret_key
@@ -98,7 +101,7 @@ def run_bot():
             f"Action probs: {action_probs}"
         )
 
-        time.sleep(DATA_INTERVAL)
+        time.sleep(DATA_FREQUENCY_SECS)
 
 # ------------------------------
 # Run bot

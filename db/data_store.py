@@ -6,10 +6,11 @@ import time
 import pandas as pd
 from db.settings import DUCKDB_FILE_PATH, SYMBOL, TICKS_TABLE_NAME
 from helpers import add_bollinger_bands, add_ema, add_macd, add_rsi, connection_is_good, get_latest_candles
+import runtime_settings
 
 
 client = Client(tld='com')
-store_frequency_secs = 5
+store_frequency_secs = runtime_settings.DATA_FREQUENCY_SECS
 
 
 @dataclass

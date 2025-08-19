@@ -9,7 +9,6 @@ import runtime_settings
 from services.core.models import BTCFDUSDData, BTCFDUSDTick
 from db.data_store import DataStore
 from django.conf import settings
-from binance.client import Client
 
 client = runtime_settings.read_only_client
 
@@ -19,9 +18,7 @@ DATA_TABLE_NAME = BTCFDUSDData._meta.db_table
 BASE_ASSET = runtime_settings.BASE_ASSET
 QUOTE_ASSET = runtime_settings.QUOTE_ASSET
 SYMBOL = f"{BASE_ASSET}{QUOTE_ASSET}"
-
-
-store_frequency_secs = 5
+DATA_FREQUENCY_SECS = runtime_settings.DATA_FREQUENCY_SECS
 
 
 class DataRepository():
@@ -187,7 +184,7 @@ class DataRepository():
         Fetch the last `num_ticks` tick data from the BTCFDUSDData table.
         """
         end_time = datetime.now(timezone.utc)
-        start_time = end_time - pd.Timedelta(seconds=num_ticks * store_frequency_secs)
+        start_time = end_time - pd.Timedelta(seconds=num_ticks * DATA_FREQUENCY_SECS)
         ticks = BTCFDUSDData.objects.filter(timestamp__gte=start_time, timestamp__lte=end_time).order_by('timestamp')
         return list(ticks)
 

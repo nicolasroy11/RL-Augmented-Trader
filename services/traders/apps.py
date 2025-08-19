@@ -17,6 +17,7 @@ class FullCycle:
     position_size = 0.0
     entry_price = 0.0
     realized_pnl = 0.0
+    initial_quote_balance = 0.0
     start_time = None
     end_time = None
 
@@ -26,6 +27,17 @@ class TradersConfig(AppConfig):
     name = "services.traders"
 
     def ready(self):
+        client_test = runtime_settings.write_client.create_test_order(
+            symbol='ETHUSDT',
+            side='BUY',
+            type='LIMIT',
+            timeInForce='GTC',
+            quantity=0.01,
+            price='2000.00'
+        )
+        if client_test != {}:
+            t = 0
+
         from threading import Thread
         self.current_cycle: FullCycle = None
         self.run: List[FullCycle] = []
@@ -43,11 +55,11 @@ class TradersConfig(AppConfig):
         BASE_ASSET = runtime_settings.BASE_ASSET
         QUOTE_ASSET = runtime_settings.QUOTE_ASSET
         SYMBOL = f"{BASE_ASSET}{QUOTE_ASSET}"
-        DATA_INTERVAL = 5
-        HISTORY_WINDOW_LENGTH = 150
+        DATA_FREQUENCY_SECS = runtime_settings.DATA_FREQUENCY_SECS
+        HISTORY_WINDOW_LENGTH = runtime_settings.DATA_TICKS_WINDOW
         DECISION_MODE = "argmax"
         POLICY_PATH = runtime_settings.RL_POLICY_PATH
-        MAX_BUY_QUANTITY = 0.01
+        MAX_BUY_QUANTITY = 0.025
 
         # ------------------------------
         # Binance client
@@ -60,7 +72,7 @@ class TradersConfig(AppConfig):
         # ------------------------------
         latest_window_data = data_repo.get_latest_tick_window_data(num_ticks=HISTORY_WINDOW_LENGTH)
         while len(latest_window_data) < HISTORY_WINDOW_LENGTH:
-            time.sleep(DATA_INTERVAL)
+            time.sleep(DATA_FREQUENCY_SECS)
             latest_window_data = data_repo.get_latest_tick_window_data(num_ticks=HISTORY_WINDOW_LENGTH)
 
         dummy_df = BaseTradingEnvironment.to_env_dataframe(latest_window_data)
@@ -102,6 +114,7 @@ class TradersConfig(AppConfig):
         def execute_trade(trade_signal, qty, price):
             notional = get_instant_notional_minimum(client=client, symbol=SYMBOL, price=price)
             if trade_signal == "buy" and self.current_cycle is None:
+                original_balances: Balances = get_balances_snapshot(client=client, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
                 buy_order: OrderReport = do_limit_buy(client=client, symbol=SYMBOL, quantity=qty, price=price, id="none")
                 qty = buy_order.filled_quantity
                 if qty > notional:
@@ -109,11 +122,12 @@ class TradersConfig(AppConfig):
                     self.current_cycle.start_time = datetime.now(tz=timezone.utc)
                     self.current_cycle.position_size = qty
                     self.current_cycle.entry_price = price
+                    self.current_cycle.initial_quote_balance = original_balances.free_quote_balance
             elif trade_signal == "sell" and self.current_cycle is not None:
-                original_balances: Balances = get_balances_snapshot(client=client, symbol=SYMBOL, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
-                sell_order: OrderReport = do_limit_sell(client=client, symbol=SYMBOL, quantity=self.current_cycle.position_size, price=price, id="none")
-                new_balances: Balances = get_balances_snapshot(client=client, symbol=SYMBOL, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
-                realized = new_balances.free_quote_balance - original_balances.free_quote_balance
+                original_balances: Balances = get_balances_snapshot(client=client, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
+                sell_order: OrderReport = do_limit_sell(client=client, symbol=SYMBOL, quantity=original_balances.free_base_balance, high_limit=price, wait_for_completion = True, id="none")
+                new_balances: Balances = get_balances_snapshot(client=client, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
+                realized = self.current_cycle.initial_quote_balance - new_balances.free_quote_balance
                 self.current_cycle.realized_pnl = realized
                 self.current_cycle.end_time = datetime.now(tz=timezone.utc)
                 self.run.append(self.current_cycle)
@@ -125,9 +139,11 @@ class TradersConfig(AppConfig):
         history_df = pd.DataFrame()
 
         while True:
+            t0 = datetime.now()
             latest_window_data = data_repo.get_latest_tick_window_data(num_ticks=HISTORY_WINDOW_LENGTH)
+            
             if len(latest_window_data) < HISTORY_WINDOW_LENGTH:
-                time.sleep(DATA_INTERVAL)
+                time.sleep(DATA_FREQUENCY_SECS)
                 continue
 
             data_df = BaseTradingEnvironment.to_env_dataframe(latest_window_data)
@@ -150,14 +166,18 @@ class TradersConfig(AppConfig):
                 unrealized_pnl = (current_price - self.current_cycle.entry_price) * self.current_cycle.position_size if self.current_cycle.position_size > 0 else 0.0
 
                 print(
-                    f"{current_price:.2f} | Pos: {self.current_cycle.position_size:.6f} | Entry: {self.current_cycle.entry_price:.2f} | "
+                    f"Current price: {current_price:.2f} | Entry: {self.current_cycle.entry_price:.2f} | Pos: {self.current_cycle.position_size:.6f} |  "
                     f"Unrealized: {unrealized_pnl:.2f} | Realized: {self.current_cycle.realized_pnl:.2f} | "
                     f"Probs: {action_probs} | Action: {trade_signal}"
                 )
 
             if len(self.run):
                 print(
-                    f"Total profit so far: {sum([cycle.realized_pnl for cycle in self.run])}"
+                    f"Total profit so far: {sum([cycle.realized_pnl for cycle in self.run]):.2f}"
                 )
 
-            time.sleep(DATA_INTERVAL)
+            t1 = datetime.now()
+            time_to_sleep = DATA_FREQUENCY_SECS - (t1 - t0).total_seconds()
+            if time_to_sleep < 0: time_to_sleep = 0
+
+            time.sleep(time_to_sleep)

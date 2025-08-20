@@ -3,38 +3,11 @@ from django.db import models
 DUCKDB_TRANSFERS_SCHEMA = 'duckdb_transfers'
 
 
-class BTCFDUSDTick(models.Model):
+class CommonTickFields(models.Model):
     class Meta:
-        db_table = f'"{DUCKDB_TRANSFERS_SCHEMA}"."btcfdusd_ticks"'
-
-    def __str__(self):
-        return f"{self.timestamp} | {self.price}"
+        abstract=True
 
     timestamp = models.DateTimeField(unique=True)
-    price = models.FloatField()
-    rsi_5 = models.FloatField()
-    rsi_7 = models.FloatField()
-    rsi_12 = models.FloatField()
-    ema_short = models.FloatField()
-    ema_mid = models.FloatField()
-    ema_long = models.FloatField()
-    ema_xlong = models.FloatField()
-    macd_line = models.FloatField()
-    macd_hist = models.FloatField()
-    macd_signal = models.FloatField()
-    bb_upper = models.FloatField()
-    bb_middle = models.FloatField()
-    bb_lower = models.FloatField()
-
-
-class BTCFDUSDData(models.Model):
-    class Meta:
-        db_table = f'"public"."btcfdusd_data"'
-
-    def __str__(self):
-        return f"{self.timestamp} | {self.price}"
-
-    timestamp = models.DateTimeField(unique=True, null=False)
     price = models.FloatField(null=True)
     rsi_5 = models.FloatField(null=True)
     rsi_7 = models.FloatField(null=True)
@@ -50,3 +23,61 @@ class BTCFDUSDData(models.Model):
     bb_middle = models.FloatField(null=True)
     bb_lower = models.FloatField(null=True)
 
+
+class BTCFDUSDTick(CommonTickFields):
+    class Meta:
+        db_table = f'"{DUCKDB_TRANSFERS_SCHEMA}"."btcfdusd_ticks"'
+
+    def __str__(self):
+        return f"{self.timestamp} | {self.price}"
+
+
+class BTCFDUSDData(CommonTickFields):
+    class Meta:
+        db_table = f'"public"."btcfdusd_data"'
+
+    def __str__(self):
+        return f"{self.timestamp} | {self.price}"
+
+
+class TraderRun(models.Model):
+    class Meta:
+        db_table = f'"public"."trader_run"'
+
+    def __str__(self):
+        return f"{self.created_at} | {self.com_or_us} | {self.is_testnet} | {self.base_asset} | {self.quote_asset}"
+
+    id = models.UUIDField(primary_key=True, unique=True, verbose_name='trader_run_id', null=False)
+    com_or_us = models.CharField(max_length=3, choices=[('com', 'com'), ('us', 'us')], null=False)
+    is_testnet = models.BooleanField(null=False)
+    base_asset = models.CharField(max_length=7, null=False)
+    quote_asset = models.CharField(max_length=7, null=False)
+    created_at = models.DateTimeField()
+
+
+class SingleBuyCycle(models.Model):
+    class Meta:
+        db_table = f'"public"."single_buy_cyle"'
+
+    def __str__(self):
+        return f"{self.run_id} | {self.start_time} | {self.end_time}"
+
+    id = models.UUIDField(primary_key=True,unique=True, verbose_name='trader_run_id', null=False)
+    run_id = models.ForeignKey(TraderRun, on_delete=models.CASCADE)
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+
+
+class RunTickData(CommonTickFields):
+    class Meta:
+        db_table = f'"public"."run_tick_data"'
+
+    def __str__(self):
+        return f"{self.run_id} | {self.datetime}"
+
+    id = models.UUIDField(primary_key=True, unique=True, verbose_name='trader_run_id', null=False)
+    run_id = models.ForeignKey(TraderRun, on_delete=models.CASCADE)
+    datetime = models.DateTimeField()
+    buy_prob = models.FloatField()
+    hold_prob = models.FloatField()
+    sell_prob = models.FloatField()

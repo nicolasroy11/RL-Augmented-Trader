@@ -11,13 +11,17 @@ import runtime_settings
 import numpy as np
 import torch
 from RL.playground.stochastic.actor_critic import ActorCritic
+from services.types import Actions
+
 
 @dataclass
 class FullCycle:
     position_size = 0.0
     entry_price = 0.0
+    exit_price = 0.0
     realized_pnl = 0.0
     initial_quote_balance = 0.0
+    exit_quote_balance = 0.0
     start_time = None
     end_time = None
 
@@ -90,7 +94,7 @@ class TradersConfig(AppConfig):
         policy.eval()
 
         # ------------------------------
-        # Action probabilities from observation vector
+        # Action probabilities from normalized observation vector
         # ------------------------------
         def compute_action_probs(obs_vector):
             with torch.no_grad():
@@ -98,22 +102,27 @@ class TradersConfig(AppConfig):
                 logits, _ = policy(state_tensor)
                 dist = torch.distributions.Categorical(logits=logits)
                 probs = dist.probs.squeeze(0).cpu().numpy()
-                return {"sell": float(probs[0]), "hold": float(probs[1]), "buy": float(probs[2])}
+                return {
+                    Actions.SELL: float(probs[0]),
+                    Actions.HOLD: float(probs[1]),
+                    Actions.BUY: float(probs[2]),
+                }
 
         def decide_trade(action_probs):
             if DECISION_MODE == "sample":
-                labels = ["sell", "hold", "buy"]
-                p = np.array([action_probs["sell"], action_probs["hold"], action_probs["buy"]], dtype=float)
+                labels = list(action_probs.keys())
+                p = np.array(list(action_probs.values()), dtype=float)
                 p = p / p.sum()
                 trade_signal = np.random.choice(labels, p=p)
             else:
                 trade_signal = max(action_probs, key=action_probs.get)
-            qty = action_probs["buy"] * MAX_BUY_QUANTITY
+
+            qty = action_probs[Actions.BUY] * MAX_BUY_QUANTITY
             return trade_signal, qty
 
-        def execute_trade(trade_signal, qty, price):
+        def execute_trade(trade_signal: Actions, qty, price):
             notional = get_instant_notional_minimum(client=client, symbol=SYMBOL, price=price)
-            if trade_signal == "buy" and self.current_cycle is None:
+            if trade_signal == Actions.BUY and self.current_cycle is None:
                 original_balances: Balances = get_balances_snapshot(client=client, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
                 buy_order: OrderReport = do_limit_buy(client=client, symbol=SYMBOL, quantity=qty, price=price, id="none")
                 qty = buy_order.filled_quantity
@@ -123,11 +132,20 @@ class TradersConfig(AppConfig):
                     self.current_cycle.position_size = qty
                     self.current_cycle.entry_price = price
                     self.current_cycle.initial_quote_balance = original_balances.free_quote_balance
-            elif trade_signal == "sell" and self.current_cycle is not None:
+            elif trade_signal == Actions.SELL and self.current_cycle is not None:
                 original_balances: Balances = get_balances_snapshot(client=client, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
-                sell_order: OrderReport = do_limit_sell(client=client, symbol=SYMBOL, quantity=original_balances.free_base_balance, high_limit=price, wait_for_completion = True, id="none")
+                sell_order: OrderReport = do_limit_sell(
+                    client=client,
+                    symbol=SYMBOL,
+                    quantity=original_balances.free_base_balance,
+                    high_limit=price,
+                    wait_for_completion=True,
+                    id="none"
+                )
                 new_balances: Balances = get_balances_snapshot(client=client, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
-                realized = self.current_cycle.initial_quote_balance - new_balances.free_quote_balance
+                self.current_cycle.exit_price = price
+                self.current_cycle.exit_quote_balance = new_balances.free_quote_balance
+                realized = self.current_cycle.exit_quote_balance - self.current_cycle.initial_quote_balance
                 self.current_cycle.realized_pnl = realized
                 self.current_cycle.end_time = datetime.now(tz=timezone.utc)
                 self.run.append(self.current_cycle)
@@ -167,8 +185,7 @@ class TradersConfig(AppConfig):
 
                 print(
                     f"Current price: {current_price:.2f} | Entry: {self.current_cycle.entry_price:.2f} | Pos: {self.current_cycle.position_size:.6f} |  "
-                    f"Unrealized: {unrealized_pnl:.2f} | Realized: {self.current_cycle.realized_pnl:.2f} | "
-                    f"Probs: {action_probs} | Action: {trade_signal}"
+                    f"Unrealized: {unrealized_pnl:.2f} | Probs: { {k.name.lower(): v for k, v in action_probs.items()} } | Action: {trade_signal}"
                 )
 
             if len(self.run):
@@ -178,6 +195,7 @@ class TradersConfig(AppConfig):
 
             t1 = datetime.now()
             time_to_sleep = DATA_FREQUENCY_SECS - (t1 - t0).total_seconds()
-            if time_to_sleep < 0: time_to_sleep = 0
+            if time_to_sleep < 0:
+                time_to_sleep = 0
 
             time.sleep(time_to_sleep)

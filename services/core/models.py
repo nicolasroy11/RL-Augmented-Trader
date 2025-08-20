@@ -62,7 +62,7 @@ class SingleBuyCycle(models.Model):
     def __str__(self):
         return f"{self.run_id} | {self.start_time} | {self.end_time}"
 
-    id = models.UUIDField(primary_key=True,unique=True, verbose_name='trader_run_id', null=False)
+    id = models.UUIDField(primary_key=True,unique=True, verbose_name='single_buy_cycle_id', null=False)
     run_id = models.ForeignKey(TraderRun, on_delete=models.CASCADE)
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
@@ -75,7 +75,7 @@ class RunTickData(CommonTickFields):
     def __str__(self):
         return f"{self.run_id} | {self.datetime}"
 
-    id = models.UUIDField(primary_key=True, unique=True, verbose_name='trader_run_id', null=False)
+    id = models.UUIDField(primary_key=True, unique=True, verbose_name='run_tick_data_id', null=False)
     run_id = models.ForeignKey(TraderRun, on_delete=models.CASCADE)
     datetime = models.DateTimeField()
     buy_prob = models.FloatField()

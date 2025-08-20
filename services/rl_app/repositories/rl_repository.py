@@ -1,4 +1,3 @@
-from enum import Enum
 from typing import List
 import pandas as pd
 from RL.playground.stochastic.actor_critic import ActorCritic
@@ -20,13 +19,6 @@ from services.rl_app.environments.stochastic_single_buy import StochasticSingleB
 
 TICKS_TABLE_NAME = BTCFDUSDTick._meta.db_table
 DATA_TABLE_NAME = BTCFDUSDData._meta.db_table
-
-class Actions(Enum):
-    BUY = 1
-    HOLD = 0
-    SELL = -1
-    def __str__(self):
-        return self.name  # just "BUY", "SELL", "HOLD"
 
 
 class RLRepository():

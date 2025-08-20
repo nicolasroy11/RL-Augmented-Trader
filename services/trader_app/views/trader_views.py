@@ -22,7 +22,7 @@ class TraderViews:
     @View(
         path='run_single_buy_ppo_trader',
         http_method='GET',
-        return_type=PolicyGradientResultsDto.Serializer(),
+        return_type=FullSingleLongCycleDto.Serializer(many=True),
         description='Runs N cycles of single blocking buy trader',
         include_in_swagger=True
     )

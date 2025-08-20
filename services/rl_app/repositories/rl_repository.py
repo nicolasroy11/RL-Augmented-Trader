@@ -37,12 +37,6 @@ from services.core.models import BTCFDUSDData
 from services.core.dtos.policy_gradient_results_dto import PolicyGradientResultsDto
 from services.rl_app.environments.stochastic_single_buy import StochasticSingleBuy
 
-class Actions(Enum):
-    BUY = 1
-    HOLD = 0
-    SELL = -1
-    def __str__(self):
-        return self.name
 
 class RLRepository:
 

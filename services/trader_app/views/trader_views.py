@@ -1,7 +1,6 @@
 from django.core.handlers.wsgi import WSGIRequest
 from django.http import JsonResponse
 from services.core.dtos.full_single_long_cycle_dto import FullSingleLongCycleDto
-from services.core.dtos.policy_gradient_results_dto import PolicyGradientResultsDto
 from services.decorators.decorators.view_decorator import View
 from services.decorators.decorators.view_class_decorator import ViewClass
 from services.trader_app.repositories.trader_repository import TraderRepository
@@ -28,7 +27,7 @@ class TraderViews:
     )
     def run_single_buy_ppo_trader(req: WSGIRequest):
         def exec():
-            results = trader_repo.run_single_buy_ppo_trader(num_cycles=10)
+            results = trader_repo.run_single_buy_ppo_trader()
             dto = FullSingleLongCycleDto.Serializer(results, many=True).data
             return JsonResponse(dto, safe=False)
         return exec()

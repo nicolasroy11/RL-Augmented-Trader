@@ -3,45 +3,26 @@ import pandas as pd
 from RL.playground.stochastic.actor_critic import ActorCritic
 from RL.playground.stochastic.policy_gradient import FeedForwardNN
 import runtime_settings
-from services.core.models import BTCFDUSDData, BTCFDUSDTick
+from services.core.models import TickData, BTCFDUSDTick
 
-from typing import List
 import random
-import numpy as np
 import torch.nn as nn
-from RL.playground.stochastic.policy_gradient import FeedForwardNN
-import torch
 import torch.optim as optim
 from django.db.models.query import QuerySet
 
 from services.core.dtos.policy_gradient_results_dto import EpisodeResultsDto, PolicyGradientResultsDto
+import numpy as np
+import torch
 from services.rl_app.environments.stochastic_single_buy import StochasticSingleBuy
 
 TICKS_TABLE_NAME = BTCFDUSDTick._meta.db_table
-DATA_TABLE_NAME = BTCFDUSDData._meta.db_table
-
-
-class RLRepository():
-
-    from datetime import datetime, timezone
-from enum import Enum
-from typing import List
-import pandas as pd
-import numpy as np
-import random
-import torch
-import torch.optim as optim
-
-from RL.playground.stochastic.policy_gradient import FeedForwardNN
-from services.core.models import BTCFDUSDData
-from services.core.dtos.policy_gradient_results_dto import PolicyGradientResultsDto
-from services.rl_app.environments.stochastic_single_buy import StochasticSingleBuy
+DATA_TABLE_NAME = TickData._meta.db_table
 
 
 class RLRepository:
 
-    def run_policy_gradient(self, window_size=runtime_settings.DATA_TICKS_WINDOW, num_episodes=100, gamma=0.95, lr=1e-3) -> PolicyGradientResultsDto:
-        queryset = BTCFDUSDData.objects.order_by('timestamp').all()
+    def run_policy_gradient(self, window_size=runtime_settings.DATA_TICKS_WINDOW_LENGTH, num_episodes=100, gamma=0.95, lr=1e-3) -> PolicyGradientResultsDto:
+        queryset = TickData.objects.order_by('timestamp').all()
         data_chunks = self.get_valid_data_chunks(queryset, window_size=window_size, min_windows=10)
         if not data_chunks:
             raise ValueError("No valid chunks found with enough rows.")
@@ -153,8 +134,8 @@ class RLRepository:
         return results
     
 
-    def run_ppo(self, window_size=runtime_settings.DATA_TICKS_WINDOW, num_episodes=100, gamma=0.99, lr=3e-4, clip_epsilon=0.2, ppo_epochs=4, batch_size=64) -> PolicyGradientResultsDto:
-        queryset = BTCFDUSDData.objects.order_by('timestamp').all()
+    def run_ppo(self, window_size=runtime_settings.DATA_TICKS_WINDOW_LENGTH, num_episodes=100, gamma=0.99, lr=1e-4, clip_epsilon=0.2, ppo_epochs=4, batch_size=64) -> PolicyGradientResultsDto:
+        queryset = TickData.objects.order_by('timestamp').all()
         data_chunks = self.get_valid_data_chunks(queryset, window_size=window_size, min_windows=10)
         if not data_chunks:
             raise ValueError("No valid chunks found with enough rows.")
@@ -273,7 +254,7 @@ class RLRepository:
         return results
 
 
-    def get_valid_data_chunks(self, queryset: QuerySet[BTCFDUSDData], window_size: int, min_windows: int = 10) -> List[pd.DataFrame]:
+    def get_valid_data_chunks(self, queryset: QuerySet[TickData], window_size: int, min_windows: int = 10) -> List[pd.DataFrame]:
         """
         Convert a Django ORM queryset of ticks into a list of contiguous DataFrames (regimes),
         splitting whenever a gap > 1 minute occurs between ticks.
@@ -300,7 +281,7 @@ class RLRepository:
         for start, end in zip(split_indices[:-1], split_indices[1:]):
             chunk_df: pd.DataFrame = df.iloc[start:end].copy()
             chunk_df.drop(columns=['gap'], inplace=True)
-            if len(chunk_df) >= window_size + min_windows:
+            if len(chunk_df) >= window_size * min_windows:
                 chunks.append(chunk_df.reset_index(drop=True))
 
         return chunks

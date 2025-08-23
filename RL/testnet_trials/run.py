@@ -18,7 +18,7 @@ BASE_ASSET = runtime_settings.BASE_ASSET
 QUOTE_ASSET = runtime_settings.QUOTE_ASSET
 SYMBOL = f"{BASE_ASSET}{QUOTE_ASSET}"
 DATA_FREQUENCY_SECS = runtime_settings.DATA_FREQUENCY_SECS
-HISTORY_WINDOW = runtime_settings.DATA_TICKS_WINDOW        # ticks for indicators
+HISTORY_WINDOW = runtime_settings.DATA_TICKS_WINDOW_LENGTH        # ticks for indicators
 
 API_KEY = runtime_settings.binance_api_key
 API_SECRET = runtime_settings.binance_secret_key

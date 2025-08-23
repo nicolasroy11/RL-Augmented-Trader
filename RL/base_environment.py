@@ -2,6 +2,8 @@ import duckdb
 import pandas as pd
 import numpy as np
 
+from services.core.models import TickData
+
 class BaseTradingEnv:
     def __init__(self, db_path, window_size=10):
         self.con = duckdb.connect(db_path)
@@ -21,16 +23,15 @@ class BaseTradingEnv:
         return self._get_observation()
 
     def _get_observation(self) -> np.ndarray:
-        # Return the window of data for the current step
-        window = self.data.iloc[self.current_step - self.window_size:self.current_step]
-        # Convert to numpy array for easier processing by agents
-        return window.drop(columns=['timestamp']).to_numpy()
+        window = self.data.iloc[self.current_step - self.window_size : self.current_step]
+        window = TickData.remove_non_training_fields_in_df(df=window)
+        return window.to_numpy()
 
     def _get_normalized_observation(self):
         """Get normalized price window + derived features"""
         obs_df = self.data.iloc[self.current_step - self.window_size : self.current_step].copy()
 
-        # Get latest prices & indicators
+        # === Derived Features ===
         price = obs_df['price'].iloc[-1]
         short_ema = obs_df['ema_short'].iloc[-1]
         mid_ema   = obs_df['ema_mid'].iloc[-1]
@@ -38,8 +39,6 @@ class BaseTradingEnv:
         upper_bb  = obs_df['bb_upper'].iloc[-1]
         lower_bb  = obs_df['bb_lower'].iloc[-1]
         middle_bb = obs_df['bb_middle'].iloc[-1]
-
-        # === Derived Features ===
         derived_features = {
             "short_gt_mid": int(short_ema > mid_ema),
             "mid_gt_long": int(mid_ema > long_ema),
@@ -52,7 +51,7 @@ class BaseTradingEnv:
         }
 
         # Normalize base features (window data)
-        base_features = obs_df.drop(columns=['timestamp']).to_numpy().astype(np.float32)
+        base_features = TickData.remove_non_training_fields_in_df(df=obs_df).to_numpy().astype(np.float32)
         base_mean = base_features.mean(axis=0)
         base_std = base_features.std(axis=0) + 1e-8  # avoid div by zero
         base_features_norm = ((base_features - base_mean) / base_std).flatten()

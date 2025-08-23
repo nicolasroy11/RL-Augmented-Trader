@@ -28,7 +28,7 @@ class RLViews:
     )
     def run_policy_gradient(req: WSGIRequest):
         def exec():
-            results = rl_repo.run_policy_gradient(window_size=runtime_settings.DATA_TICKS_WINDOW, num_episodes=100)
+            results = rl_repo.run_policy_gradient(window_size=runtime_settings.DATA_TICKS_WINDOW_LENGTH, num_episodes=100)
             dto = PolicyGradientResultsDto.Serializer(results).data
             return JsonResponse(dto)
         return exec()
@@ -43,7 +43,7 @@ class RLViews:
     )
     def run_ppo(req: WSGIRequest):
         def exec():
-            results = rl_repo.run_ppo(window_size=runtime_settings.DATA_TICKS_WINDOW, num_episodes=100)
+            results = rl_repo.run_ppo(window_size=runtime_settings.DATA_TICKS_WINDOW_LENGTH, num_episodes=100)
             dto = PolicyGradientResultsDto.Serializer(results).data
             return JsonResponse(dto)
         return exec()

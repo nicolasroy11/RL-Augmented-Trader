@@ -4,7 +4,7 @@ from services.rl_app.environments.base_environment import BaseTradingEnvironment
 
 class StochasticSingleBuy(BaseTradingEnvironment):
     def __init__(self, data: pd.DataFrame, window_size=10, initial_cash=1000000):
-        super().__init__(data, window_size)
+        super().__init__(data)
         self.initial_cash = initial_cash
         self.cash = initial_cash
         self.holding = False

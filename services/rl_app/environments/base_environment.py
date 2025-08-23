@@ -11,7 +11,7 @@ from services.types import Actions
 class BaseTradingEnvironment:
 
     def __init__(self, tick_df: pd.DataFrame = None, tick_list: List[TickData] = None):
-        if not len(tick_df) and not len(tick_list):
+        if not tick_df and not tick_list:
             raise ValueError('need to pass in at tick_df or tick_list!')
         self.window_size = runtime_settings.DATA_TICKS_WINDOW_LENGTH
         if tick_list:

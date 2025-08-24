@@ -1,7 +1,8 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Dict, List
 from classes import Balances, OrderReport
-from helpers import do_limit_buy, do_limit_sell, get_balances_snapshot, get_instant_notional_minimum
+from helpers import cancel_all_orders, do_limit_buy, do_limit_sell, get_balances_snapshot, get_instant_notional_minimum
 import runtime_settings
 from services.core.dtos.full_single_long_cycle_dto import FullSingleLongCycleDto
 from services.types import Actions
@@ -38,7 +39,8 @@ class TraderRepository():
         
         # if just a test session, reset balances
         if runtime_settings.IS_TESTNET:
-            current_price = float(client.get_ticker(symbol=f'{BASE_ASSET}{QUOTE_ASSET}')['lastPrice'])
+            cancel_all_orders(client=client, symbol=SYMBOL)
+            current_price = float(client.get_ticker(symbol=SYMBOL)['lastPrice'])
             notional = get_instant_notional_minimum(client=client, symbol=SYMBOL, price=current_price)
             original_balances: Balances = get_balances_snapshot(client=client, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
             if original_balances.free_base_balance >= notional:
@@ -92,13 +94,8 @@ class TraderRepository():
                 f"Unrealized: {unrealized_pnl:.2f} | Probs: { {k.name.lower(): round(v, 4) for k, v in action_probs.items()} } | Action: {trade_signal}"
             )
 
-        if len(self.run):
-            print(
-                f"Total profit so far: {sum([cycle.realized_pnl for cycle in self.run]):.2f}"
-            )
-
-        if len(self.run) >= self.num_cycles:
-            return self.run
+        realized_pnl = self.get_realized_pnl()
+        print(f'realized_pnl: {realized_pnl}')
 
 
     def on_tick_stored(self, context):
@@ -129,6 +126,38 @@ class TraderRepository():
 
         qty = action_probs[Actions.BUY] * self.max_buy_quantity
         return trade_signal, qty
+    
+
+    def get_realized_pnl(self):
+        pnl = Decimal("0.0")
+        position = Decimal("0.0")
+        entry_price = None
+
+        for tx in list(Transaction.objects.filter(trading_session_id=self.trading_session.id).order_by("tick_data__timestamp")):
+            price = Decimal(str(tx.strike_price))
+            amount = Decimal(str(tx.base_amount))
+
+            if tx.side == SIDE_BUY:
+                # Open (or increase) a long position
+                if position == 0:
+                    entry_price = price
+                # Weighted average entry price if adding to existing position
+                entry_price = ((entry_price * position) + (price * amount)) / (position + amount)
+                position += amount
+
+            elif tx.side == SIDE_SELL:
+                if position > 0:
+                    # Closing long position -> realize PnL
+                    pnl += (price - entry_price) * min(position, amount)
+                    position -= amount
+
+                    if position == 0:
+                        entry_price = None
+                else:
+                    # Shorting (not implemented, but you could extend logic here)
+                    raise NotImplementedError("Short trades not handled yet")
+
+        return float(pnl)
     
 
     def execute_trade(self, trade_signal: Actions, qty, price):
@@ -176,3 +205,4 @@ class TraderRepository():
             transaction.save()
             self.current_buy = None
             self.block_buys = False
+

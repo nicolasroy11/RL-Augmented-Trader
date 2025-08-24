@@ -132,31 +132,22 @@ class TraderRepository():
         pnl = Decimal("0.0")
         position = Decimal("0.0")
         entry_price = None
-
         for tx in list(Transaction.objects.filter(trading_session_id=self.trading_session.id).order_by("tick_data__timestamp")):
             price = Decimal(str(tx.strike_price))
             amount = Decimal(str(tx.base_amount))
-
             if tx.side == SIDE_BUY:
-                # Open (or increase) a long position
                 if position == 0:
                     entry_price = price
-                # Weighted average entry price if adding to existing position
                 entry_price = ((entry_price * position) + (price * amount)) / (position + amount)
                 position += amount
-
             elif tx.side == SIDE_SELL:
                 if position > 0:
-                    # Closing long position -> realize PnL
                     pnl += (price - entry_price) * min(position, amount)
                     position -= amount
-
                     if position == 0:
                         entry_price = None
                 else:
-                    # Shorting (not implemented, but you could extend logic here)
                     raise NotImplementedError("Short trades not handled yet")
-
         return float(pnl)
     
 

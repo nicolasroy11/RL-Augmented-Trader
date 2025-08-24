@@ -1,6 +1,5 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, List
-from uuid import UUID
 from classes import Balances, OrderReport
 from helpers import do_limit_buy, do_limit_sell, get_balances_snapshot, get_instant_notional_minimum
 import runtime_settings
@@ -30,7 +29,8 @@ client = runtime_settings.write_client
 class TraderRepository():
 
     def __init__(self):
-        self.current_cycle: FullSingleLongCycleDto = None
+        self.current_buy: Transaction = None
+        self.block_buys = False
         self.run: List[FullSingleLongCycleDto] = []
         self.max_buy_quantity = 0.025
         self.data_repo = DataRepository()
@@ -48,7 +48,7 @@ class TraderRepository():
                     quantity=original_balances.free_base_balance,
                     high_limit=current_price,
                     wait_for_completion=True,
-                    id=UUID()
+                    id=int(datetime.now().timestamp())
                 )
             new_balances: Balances = get_balances_snapshot(client=client, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
             if new_balances.free_base_balance < notional: print('good to go')
@@ -82,11 +82,13 @@ class TraderRepository():
         self.execute_trade(trade_signal, qty, current_price)
         self.store_tick_probs(self.last_tick, action_probs)
 
-        if self.current_cycle is not None:
-            unrealized_pnl = (current_price - self.current_cycle.entry_price) * self.current_cycle.position_size if self.current_cycle.position_size > 0 else 0.0
+        balances: Balances = get_balances_snapshot(client=client, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
+
+        if balances.free_base_balance > 0:
+            unrealized_pnl = (current_price - self.current_buy.strike_price) * self.current_buy.base_amount if self.current_buy.base_amount > 0 else 0.0
 
             print(
-                f"Current price: {current_price:.2f} | Entry: {self.current_cycle.entry_price:.2f} | Pos: {self.current_cycle.position_size:.6f} |  "
+                f"Current price: {current_price:.2f} | Entry: {self.current_buy.strike_price:.2f} | Pos: {self.current_buy.base_amount:.6f} |  "
                 f"Unrealized: {unrealized_pnl:.2f} | Probs: { {k.name.lower(): round(v, 4) for k, v in action_probs.items()} } | Action: {trade_signal}"
             )
 
@@ -133,7 +135,8 @@ class TraderRepository():
         notional = get_instant_notional_minimum(client=client, symbol=SYMBOL, price=price)
         original_balances: Balances = get_balances_snapshot(client=client, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
         id = int(datetime.now().timestamp())
-        if trade_signal == Actions.BUY and original_balances.free_base_balance < notional:
+        if trade_signal == Actions.BUY and original_balances.free_base_balance <= notional and self.current_buy is None and not self.block_buys:
+            self.block_buys = True
             buy_order: OrderReport = do_limit_buy(
                 client=client,
                 symbol=SYMBOL,
@@ -143,20 +146,18 @@ class TraderRepository():
             )
             qty = buy_order.filled_quantity
             if qty > notional:
-                self.current_cycle = FullSingleLongCycleDto()
-                self.current_cycle.start_time = datetime.now(tz=timezone.utc)
-                self.current_cycle.position_size = qty
-                self.current_cycle.entry_price = price
-                self.current_cycle.initial_quote_balance = original_balances.free_quote_balance
-
                 transaction = Transaction()
                 transaction.side = SIDE_BUY
                 transaction.trading_session = self.trading_session
                 transaction.strike_price = price
+                transaction.base_amount = qty
                 transaction.tick_data = self.last_tick
                 transaction.save()
+                self.current_buy = transaction
+            else:
+                self.block_buys = False
 
-        elif trade_signal == Actions.SELL and original_balances.free_base_balance >= notional:
+        elif trade_signal == Actions.SELL and original_balances.free_base_balance > notional:
             sell_order: OrderReport = do_limit_sell(
                 client=client,
                 symbol=SYMBOL,
@@ -166,17 +167,12 @@ class TraderRepository():
                 id=id
             )
             new_balances: Balances = get_balances_snapshot(client=client, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
-            self.current_cycle.exit_price = price
-            self.current_cycle.exit_quote_balance = new_balances.free_quote_balance
-            realized = self.current_cycle.exit_quote_balance - self.current_cycle.initial_quote_balance
-            self.current_cycle.realized_pnl = realized
-            self.current_cycle.end_time = datetime.now(tz=timezone.utc)
-            self.run.append(self.current_cycle)
-            
             transaction = Transaction()
             transaction.side = SIDE_SELL
             transaction.strike_price = price
             transaction.tick_data = self.last_tick
+            transaction.base_amount = original_balances.free_base_balance - new_balances.free_base_balance
             transaction.trading_session = self.trading_session
             transaction.save()
-            self.current_cycle = None
+            self.current_buy = None
+            self.block_buys = False

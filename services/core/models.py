@@ -254,6 +254,7 @@ class Transaction(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, verbose_name='single_buy_cycle_id', null=False)
     side = models.CharField(max_length=8, choices=[(SIDE_BUY, SIDE_BUY), (SIDE_SELL, SIDE_SELL)], null=True)
-    tick_data = models.ForeignKey(TickData, on_delete=models.CASCADE, null=False)
+    tick_data = models.ForeignKey(TickData, on_delete=models.DO_NOTHING, null=False)
     trading_session = models.ForeignKey(TradingSession, on_delete=models.CASCADE, null=False)
     strike_price = models.FloatField()
+    base_amount = models.FloatField()

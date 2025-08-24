@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Dict, List
 from classes import Balances, OrderReport
-from helpers import cancel_all_orders, do_limit_buy, do_limit_sell, get_balances_snapshot, get_instant_notional_minimum
+from helpers import cancel_all_orders, do_limit_buy, do_limit_sell, do_market_sell, get_balances_snapshot, get_instant_notional_minimum
 import runtime_settings
 from services.core.dtos.full_single_long_cycle_dto import FullSingleLongCycleDto
 from services.types import Actions
@@ -44,13 +44,10 @@ class TraderRepository():
             notional = get_instant_notional_minimum(client=client, symbol=SYMBOL, price=current_price)
             original_balances: Balances = get_balances_snapshot(client=client, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
             if original_balances.free_base_balance >= notional:
-                sell_order: OrderReport = do_limit_sell(
+                sell_order: OrderReport = do_market_sell(
                     client=client,
                     symbol=SYMBOL,
-                    quantity=original_balances.free_base_balance,
-                    high_limit=current_price,
-                    wait_for_completion=True,
-                    id=int(datetime.now().timestamp())
+                    quantity=original_balances.free_base_balance
                 )
             new_balances: Balances = get_balances_snapshot(client=client, base_asset=BASE_ASSET, quote_asset=QUOTE_ASSET)
             if new_balances.free_base_balance < notional: print('good to go')
@@ -62,10 +59,12 @@ class TraderRepository():
         trading_session.blocking = True
         trading_session.save()
         self.trading_session = trading_session
+        self.loop_number = 0
         self.start_process()
 
 
     def run_loop(self):
+        self.loop_number += 1
         latest_window_data = self.data_repo.get_latest_tick_window_data_by_run(num_ticks=HISTORY_WINDOW_LENGTH, run_id=self.data_repo.data_run.id)
         
         if len(latest_window_data) < 5:
@@ -96,6 +95,7 @@ class TraderRepository():
 
         realized_pnl = self.get_realized_pnl()
         print(f'realized_pnl: {realized_pnl}')
+        print(f'\nloop: {self.loop_number} ============================================================================================================================\n')
 
 
     def on_tick_stored(self, context):

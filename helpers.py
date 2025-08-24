@@ -588,6 +588,24 @@ def cancel_order(client: Client, symbol: str, order_id: str):
     return True
 
 
+def cancel_all_orders(client: Client, symbol: str):
+    orders = client.get_open_orders(symbol=symbol)
+    for order in orders:
+        id = order['orderId']
+        client.cancel_order(
+            symbol=symbol,
+            orderId=id
+        )
+        while True:
+            # check for status until all filled
+            order = client.get_order(symbol=symbol, orderId=id)
+            print(f'    cancel_order_status: {order["status"]}')
+            if order['status'] == client.ORDER_STATUS_CANCELED:
+                print(f'    order canceled\n')
+                break
+        return True
+
+
 def futures_cancel_order(client: Client, symbol: str, order_id: str):
     client.futures_cancel_order(
         symbol=symbol,

@@ -1,30 +1,26 @@
-from dataclasses import dataclass, fields
 from typing import List
 import uuid
 from django.db import models
-from binance.enums import SIDE_BUY, SIDE_SELL
+from binance.enums import SIDE_BUY, SIDE_SELL, KLINE_INTERVAL_1MINUTE, KLINE_INTERVAL_15MINUTE
 import pandas as pd
-import numpy as np
-
 import runtime_settings
 
-DUCKDB_TRANSFERS_SCHEMA = 'duckdb_transfers'
 
 WINDOW_LENGTH = runtime_settings.DATA_TICKS_WINDOW_LENGTH
-
 
 class TrainingFields(models.Model):
     class Meta:
         abstract = True
 
     price = models.FloatField(null=True)
-    rsi_5 = models.FloatField(null=True)
-    rsi_7 = models.FloatField(null=True)
-    rsi_12 = models.FloatField(null=True)
-    ema_short = models.FloatField(null=True)
-    ema_mid = models.FloatField(null=True)
-    ema_long = models.FloatField(null=True)
-    ema_xlong = models.FloatField(null=True)
+    rsi_1 = models.FloatField(null=True)
+    rsi_2 = models.FloatField(null=True)
+    rsi_3 = models.FloatField(null=True)
+    rsi_4 = models.FloatField(null=True)
+    ema_1 = models.FloatField(null=True)
+    ema_2 = models.FloatField(null=True)
+    ema_3 = models.FloatField(null=True)
+    ema_4 = models.FloatField(null=True)
     macd_line = models.FloatField(null=True)
     macd_hist = models.FloatField(null=True)
     macd_signal = models.FloatField(null=True)
@@ -35,125 +31,6 @@ class TrainingFields(models.Model):
     @staticmethod
     def get_fields():
         return {field.name for field in TrainingFields._meta.get_fields() if field.concrete and not field.many_to_many}
-
-    @dataclass
-    class ObservationFeatures:
-
-        # === Base features ===
-        price: float
-        rsi_5: float
-        rsi_7: float
-        rsi_12: float
-        ema_short: float
-        ema_mid: float
-        ema_long: float
-        ema_xlong: float
-        macd_line: float
-        macd_hist: float
-        macd_signal: float
-        bb_upper: float
-        bb_middle: float
-        bb_lower: float
-
-        # === Derived features === 
-        short_gt_mid: int
-        mid_gt_long: int
-        all_trend_up: int
-        price_gt_long: int
-        breakout_high: int
-        bb_squeeze: float
-        ema_slope_sign: float
-        dist_from_short_ema: float
-        price_above_upper_bb: int
-        price_below_lower_bb: int
-        price_vs_middle_bb: float
-        bb_width: float
-        bb_percent_b: float
-
-        # Position features
-        position: float
-        relative_entry_price: float
-        unrealized_pnl: float
-
-        @classmethod
-        def get_fields(cls):
-            return [f.name for f in fields(cls)]
-        
-        @classmethod
-        def get_vector_size(cls):
-            tfl = len(TrainingFields.get_fields())
-            return (tfl * runtime_settings.DATA_TICKS_WINDOW_LENGTH) + (len([f.name for f in fields(cls)]) - tfl)
-
-        @classmethod
-        def normalized_vector_from_obs_df(cls, obs_df: pd.DataFrame, position, entry_price):
-
-            # === Derived features ===
-            price = obs_df['price'].iloc[-1]
-            short_ema = obs_df['ema_short'].iloc[-1]
-            mid_ema   = obs_df['ema_mid'].iloc[-1]
-            long_ema  = obs_df['ema_long'].iloc[-1]
-            upper_bb  = obs_df['bb_upper'].iloc[-1]
-            lower_bb  = obs_df['bb_lower'].iloc[-1]
-            middle_bb = obs_df['bb_middle'].iloc[-1]
-            derived_features = {
-                "short_gt_mid": int(short_ema > mid_ema),
-                "mid_gt_long": int(mid_ema > long_ema),
-                "all_trend_up": int(short_ema > mid_ema > long_ema),
-                "price_gt_long": int(price > long_ema),
-                "breakout_high": int(price >= obs_df['price'].max()),
-                "bb_squeeze": float((upper_bb - lower_bb) / middle_bb if middle_bb != 0 else 0),
-                "ema_slope_sign": np.sign(short_ema - obs_df['ema_short'].iloc[-2]),
-                "dist_from_short_ema": (price - short_ema) / short_ema if short_ema != 0 else 0,
-                "price_above_upper_bb": int(price > upper_bb),
-                "price_below_lower_bb": int(price < lower_bb),
-                "price_vs_middle_bb": (price - middle_bb) / middle_bb if middle_bb != 0 else 0,
-                "bb_width": float(upper_bb - lower_bb),
-                "bb_percent_b": ((price - lower_bb) / (upper_bb - lower_bb)) if (upper_bb - lower_bb) != 0 else 0,
-            }
-
-            # === Position state features ===
-            current_price = price
-            position_features = np.array([
-                float(position),  # 0 = flat, 1 = long
-                (entry_price / current_price) if position == 1 else 0.0,  # relative entry price
-                ((current_price - entry_price) / entry_price) if position == 1 else 0.0  # % unrealized pnl
-            ], dtype=np.float32)
-
-            # === Normalize base features ===
-            base_features = TickData.remove_non_training_fields_in_df(df=obs_df)
-            base_features = base_features.to_numpy().astype(np.float32)
-            base_mean = base_features.mean(axis=0)
-            base_std = base_features.std(axis=0) + 1e-8
-            base_features_norm = ((base_features - base_mean) / base_std).flatten()
-
-            # === Normalize derived features ===
-            derived_array = np.array(list(derived_features.values()), dtype=np.float32)
-            derived_mean = derived_array.mean()
-            derived_std = derived_array.std() + 1e-8
-            derived_features_norm = (derived_array - derived_mean) / derived_std
-
-            # === Normalize position features (already ratio-based, so just z-score) ===
-            pos_mean = position_features.mean()
-            pos_std = position_features.std() + 1e-8
-            position_features_norm = (position_features - pos_mean) / pos_std
-
-            # === Final observation vector ===
-            return np.concatenate([base_features_norm, derived_features_norm, position_features_norm])
-                
-
-        def normalized_vector(self):
-            arr = np.array([getattr(self, f) for f in self.__dataclass_fields__], dtype=np.float32)
-            return (arr - arr.mean()) / (arr.std() + 1e-8)
-
-
-class BTCFDUSDTick(TrainingFields):
-    class Meta:
-        db_table = f'"{DUCKDB_TRANSFERS_SCHEMA}"."btcfdusd_ticks"'
-
-    def __str__(self):
-        return f"{self.timestamp} | {self.price}"
-    
-    timestamp = models.DateTimeField(unique=True, db_index=True)
 
 
 class DataRun(models.Model):
@@ -239,12 +116,156 @@ class TickProbabilities(models.Model):
     sell_prob = models.FloatField(null=True)
 
 
+class BaseObservationSet(models.Model):
+    class Meta:
+        db_table = '"public"."base_observation_sets"'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    name = models.CharField(max_length=40, null=True)
+    candle_interval = models.CharField(max_length=10,choices=[(KLINE_INTERVAL_1MINUTE, KLINE_INTERVAL_1MINUTE),(KLINE_INTERVAL_15MINUTE, KLINE_INTERVAL_15MINUTE)])
+
+    def __str__(self):
+        return self.name
+
+
+class RSI(models.Model):
+    class Meta:
+        db_table = '"public"."rsi"'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    length = models.IntegerField()
+    is_sequence = models.BooleanField()
+    base_observation_set = models.ForeignKey(BaseObservationSet, on_delete=models.CASCADE, related_name="rsis")
+
+    def __str__(self):
+        return f"rsi_{self.length}"
+    
+class EMA(models.Model):
+    class Meta:
+        db_table = '"public"."ema"'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    length = models.IntegerField()
+    is_sequence = models.BooleanField()
+    base_observation_set = models.ForeignKey(BaseObservationSet, on_delete=models.CASCADE, related_name="emas")
+
+    def __str__(self):
+        return f"ema_{self.length}"
+    
+class MACD(models.Model):
+    class Meta:
+        db_table = '"public"."macd"'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    fast = models.IntegerField()
+    slow = models.IntegerField()
+    signal = models.IntegerField()
+    is_sequence = models.BooleanField()
+    base_observation_set = models.ForeignKey(BaseObservationSet, on_delete=models.CASCADE, related_name="macds")
+
+    def __str__(self):
+        return f"macd_{self.fast}_{self.slow}_{self.signal}'"
+    
+class BollingerBands(models.Model):
+    class Meta:
+        db_table = '"public"."bollinger_bands"'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    length = models.IntegerField()
+    std_dev = models.FloatField()
+    is_sequence = models.BooleanField()
+    base_observation_set = models.ForeignKey(BaseObservationSet, on_delete=models.CASCADE, related_name="bbands")
+
+    def __str__(self):
+        return f"bband_{self.length}_{self.std_dev}'"
+
+
+class FeatureSet(models.Model):
+    class Meta:
+        db_table = '"public"."feature_sets"'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    name = models.CharField(max_length=40)
+    base_observation_set = models.ForeignKey(BaseObservationSet, on_delete=models.CASCADE, related_name="feature_sets")
+    window_length = models.IntegerField()
+
+    def __str__(self):
+        return self.name
+    
+    def get_feature_vector_size(self):
+        vector_size = 0
+        base_set = self.base_observation_set
+        vector_size += self.window_length # TODO: because of the price column, include the price in a dynamic way
+
+        rsi: RSI
+        for rsi in base_set.rsis.all():
+            if rsi.is_sequence:
+                vector_size += self.window_length
+            else:
+                vector_size += 1
+
+        ema: EMA
+        for ema in base_set.emas.all():
+            if ema.is_sequence:
+                vector_size += self.window_length
+            else:
+                vector_size += 1
+
+        macd: MACD
+        for macd in base_set.macds.all():
+            if macd.is_sequence:
+                vector_size += (self.window_length * 3)
+            else:
+                vector_size += 3
+
+        bband: BollingerBands
+        for bband in base_set.bbands.all():
+            if bband.is_sequence:
+                vector_size += (self.window_length * 3)
+            else:
+                vector_size += 3
+
+        derived_feature_mappings = list(DerivedfeatureSetMapping.objects.filter(feature_set_id=self.id))
+        m: DerivedfeatureSetMapping
+        for m in derived_feature_mappings:
+            if m.derived_feature.is_sequence:
+                vector_size += self.window_length
+            else:
+                vector_size += 1
+
+        return vector_size
+    
+
+class DerivedFeature(models.Model):
+    class Meta:
+        db_table = '"public"."derived_features"'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    method_name = models.CharField(max_length=40)
+    is_sequence = models.BooleanField()
+
+    def __str__(self):
+        return self.method_name
+
+
+class DerivedfeatureSetMapping(models.Model):
+    class Meta:
+        db_table = '"public"."derived_feature_mappings"'
+
+    feature_set = models.ForeignKey(FeatureSet, on_delete=models.CASCADE, related_name="mappings")
+    derived_feature = models.ForeignKey(DerivedFeature, on_delete=models.CASCADE, related_name="mapped_sets")
+
+    def __str__(self):
+        return f"{self.feature_set.name} - {self.derived_feature.method_name}"
+
+
 class TradingSession(models.Model):
     class Meta:
         db_table = f'"public"."trading_sessions"'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, verbose_name='trading_session_id', null=False)
     data_run = models.ForeignKey(DataRun, on_delete=models.CASCADE, null=False)
+    feature_set = models.ForeignKey(FeatureSet, on_delete=models.CASCADE, null=False)
     blocking = models.BooleanField(null=False)
 
 
@@ -258,3 +279,4 @@ class Transaction(models.Model):
     trading_session = models.ForeignKey(TradingSession, on_delete=models.CASCADE, null=False)
     strike_price = models.FloatField()
     base_amount = models.FloatField()
+

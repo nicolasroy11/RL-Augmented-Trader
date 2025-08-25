@@ -9,7 +9,7 @@ from services.types import Actions
 from binance.enums import SIDE_BUY, SIDE_SELL
 import numpy as np
 
-from services.core.models import TickData, TickProbabilities, TradingSession, Transaction
+from services.core.models import FeatureSet, TickData, TickProbabilities, TradingSession, Transaction
 from services.rl_app.environments.base_environment import BaseTradingEnvironment
 from services.data_app.repositories.data_repository import DataRepository
 
@@ -34,7 +34,6 @@ class TraderRepository():
         self.block_buys = False
         self.run: List[FullSingleLongCycleDto] = []
         self.max_buy_quantity = 0.025
-        self.data_repo = DataRepository()
         self.num_cycles: int = 300
         
         # if just a test session, reset balances
@@ -53,10 +52,16 @@ class TraderRepository():
             if new_balances.free_base_balance < notional: print('good to go')
 
 
-    def run_single_buy_ppo_trader(self) -> List[FullSingleLongCycleDto]:
+    def run_single_buy_ppo_trader(self, feature_set_name: str) -> List[FullSingleLongCycleDto]:
+        feature_set = FeatureSet.objects.filter(name=feature_set_name).first()
+        if not feature_set:
+            feature_set = FeatureSet.objects.filter(name='default').first()
+        self.feature_set = feature_set
         trading_session = TradingSession()
+        self.data_repo = DataRepository(feature_set_name=feature_set_name)
         trading_session.data_run = self.data_repo.data_run
         trading_session.blocking = True
+        trading_session.feature_set = feature_set
         trading_session.save()
         self.trading_session = trading_session
         self.loop_number = 0
@@ -71,7 +76,7 @@ class TraderRepository():
             print(f"latest_window_data: {len(latest_window_data)}")
             return
         
-        env = BaseTradingEnvironment(tick_list=latest_window_data)
+        env = BaseTradingEnvironment(tick_list=latest_window_data, feature_set=self.feature_set)
         action_probs = env.get_inference_action_probs()
 
         self.last_tick = latest_window_data[-1]

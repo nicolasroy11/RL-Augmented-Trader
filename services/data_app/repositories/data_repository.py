@@ -8,13 +8,13 @@ from apscheduler.events import EVENT_JOB_EXECUTED
 
 import pandas as pd
 from db.settings import SYMBOL
-from helpers import add_bollinger_bands, add_ema, add_macd, add_rsi, connection_is_good, get_latest_candles
+from helpers import connection_is_good, get_latest_candles
 import runtime_settings
-from services.core.models import DataRun, TickData, BTCFDUSDTick
+from services.core.models import EMA, MACD, RSI, BollingerBands, DataRun, FeatureSet, TickData
+import pandas_ta as ta
 
 client = runtime_settings.read_only_client
 
-TICKS_TABLE_NAME = BTCFDUSDTick._meta.db_table
 DATA_TABLE_NAME = TickData._meta.db_table
 BASE_ASSET = runtime_settings.BASE_ASSET
 QUOTE_ASSET = runtime_settings.QUOTE_ASSET
@@ -24,7 +24,11 @@ DATA_FREQUENCY_SECS = runtime_settings.DATA_FREQUENCY_SECS
 
 class DataRepository():
 
-    def __init__(self):
+    def __init__(self, feature_set_name: str = None):
+        feature_set = FeatureSet.objects.filter(name=feature_set_name).first()
+        if not feature_set:
+            feature_set = FeatureSet.objects.filter(name='default').first()
+        self.feature_set = feature_set
         data_run = DataRun()
         data_run.com_or_us = runtime_settings.COM_OR_US
         data_run.is_testnet = runtime_settings.IS_TESTNET
@@ -45,48 +49,40 @@ class DataRepository():
         )
         if callback is not None: scheduler.add_listener(callback=callback, mask=EVENT_JOB_EXECUTED)
         scheduler.start()
+    
 
+    def get_tick_data(self):
+        tick = TickData()
+        tick.timestamp = datetime.now(timezone.utc)
+        ticker = runtime_settings.read_only_client.get_symbol_ticker(symbol=SYMBOL)
+        tick.price = float(ticker['price'])
 
-    def get_tick_data(self) -> TickData:
-        short_ema_length = 7
-        mid_ema_length = 12
-        long_ema_length = 30
-        xlong_ema_length = 150
-        short_rsi_length = 5
-        mid_rsi_length = 7
-        long_rsi_length = 12
-        bollinger_length = 14
-        ts = datetime.now(timezone.utc)
-        ticker = client.get_symbol_ticker(symbol=SYMBOL)
-        price = float(ticker['price'])
-        data: pd.DataFrame = get_latest_candles(client, SYMBOL, xlong_ema_length * 50, client.KLINE_INTERVAL_1MINUTE)
-        data = add_rsi(data, length=short_rsi_length)
-        data = add_rsi(data, length=mid_rsi_length)
-        data = add_rsi(data, length=long_rsi_length)
-        data = add_ema(data, length=short_ema_length)
-        data = add_ema(data, length=mid_ema_length)
-        data = add_ema(data, length=long_ema_length)
-        data = add_ema(data, length=xlong_ema_length)
-        data = add_macd(data)
-        data = add_bollinger_bands(data, length=bollinger_length, std_dev=2.0)
+        fs = self.feature_set
+        base_set = fs.base_observation_set
+        df: pd.DataFrame = get_latest_candles(runtime_settings.read_only_client, SYMBOL, fs.window_length * 50, base_set.candle_interval)
+        
+        rsi: RSI
+        for i, rsi in enumerate(base_set.rsis.order_by('length').all(), start=1):
+            setattr(tick, f'rsi_{i}', ta.rsi(df['Close'], length=rsi.length).iloc[-1])
 
-        tick = TickData(
-                        timestamp = ts,
-                        price = price,
-                        rsi_5 = data[f'rsi_{short_rsi_length}'].iloc[-1],
-                        rsi_7 = data[f'rsi_{mid_rsi_length}'].iloc[-1],
-                        rsi_12 = data[f'rsi_{long_rsi_length}'].iloc[-1],
-                        ema_short = data[f'ema_{short_ema_length}'].iloc[-1],
-                        ema_mid = data[f'ema_{mid_ema_length}'].iloc[-1],
-                        ema_long = data[f'ema_{long_ema_length}'].iloc[-1],
-                        ema_xlong = data[f'ema_{xlong_ema_length}'].iloc[-1],
-                        macd_line = data['macd_line'].iloc[-1],
-                        macd_hist = data['macd_hist'].iloc[-1],
-                        macd_signal = data['macd_signal'].iloc[-1],
-                        bb_upper = data['bb_upper'].iloc[-1],
-                        bb_middle = data['bb_middle'].iloc[-1],
-                        bb_lower = data['bb_lower'].iloc[-1],
-                    )
+        ema: EMA
+        for i, ema in enumerate(base_set.emas.order_by('length').all(), start=1):
+            setattr(tick, f'ema_{i}', ta.ema(df['Close'], length=ema.length).iloc[-1])
+
+        macd: MACD
+        for macd in base_set.macds.all():
+            _macd = ta.macd(close=df['Close'], fast=macd.fast, slow=macd.slow, signal=macd.signal)
+            tick.macd_line = _macd[f'MACD_{macd.fast}_{macd.slow}_{macd.signal}'].iloc[-1]
+            tick.macd_hist = _macd[f'MACDh_{macd.fast}_{macd.slow}_{macd.signal}'].iloc[-1]
+            tick.macd_signal = _macd[f'MACDs_{macd.fast}_{macd.slow}_{macd.signal}'].iloc[-1]
+
+        bband: BollingerBands
+        for bband in base_set.bbands.all():
+            _bband = ta.bbands(df['Close'], length=bband.length, std=bband.std_dev)
+            tick.bb_upper = _bband[f'BBU_{bband.length}_{bband.std_dev}'].iloc[-1]
+            tick.bb_middle = _bband[f'BBM_{bband.length}_{bband.std_dev}'].iloc[-1]
+            tick.bb_lower = _bband[f'BBL_{bband.length}_{bband.std_dev}'].iloc[-1]
+
         tick.data_run = self.data_run
         return tick
     
@@ -98,23 +94,11 @@ class DataRepository():
                 self.insert_tick_data(tick)
                 print(f'stored tick: {tick.timestamp} - {tick.price}')
             except BaseException as e:
-                now = datetime.now(timezone.utc)
-                print(f'stored tick: {now} - {e}')
-                self.insert_empty_tick_data(timestamp=now)
-        else:
-            now = datetime.now(timezone.utc)
-            self.insert_empty_tick_data(timestamp=now)
+                print(f'tick not stored: {e}')
 
     
     def insert_tick_data(self, tick: TickData):
         tick.save()
-
-
-    def insert_empty_tick_data(self, timestamp: datetime):
-        TickData.objects.create(
-            timestamp=timestamp,
-            data_run=self.data_run
-        )
 
 
     def get_latest_tick_window_data(self, num_ticks: int) -> List[TickData]:

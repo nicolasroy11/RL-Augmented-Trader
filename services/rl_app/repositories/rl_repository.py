@@ -3,7 +3,7 @@ import pandas as pd
 from RL.playground.stochastic.actor_critic import ActorCritic
 from RL.playground.stochastic.policy_gradient import FeedForwardNN
 import runtime_settings
-from services.core.models import TickData, BTCFDUSDTick
+from services.core.models import TickData
 
 import random
 import torch.nn as nn
@@ -15,7 +15,6 @@ import numpy as np
 import torch
 from services.rl_app.environments.stochastic_single_buy import StochasticSingleBuy
 
-TICKS_TABLE_NAME = BTCFDUSDTick._meta.db_table
 DATA_TABLE_NAME = TickData._meta.db_table
 
 

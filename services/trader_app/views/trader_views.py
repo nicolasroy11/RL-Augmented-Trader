@@ -26,8 +26,9 @@ class TraderViews:
         include_in_swagger=True
     )
     def run_single_buy_ppo_trader(req: WSGIRequest):
+        feature_set = req.GET.get('feature_set')
         def exec():
-            results = trader_repo.run_single_buy_ppo_trader()
+            results = trader_repo.run_single_buy_ppo_trader(feature_set_name=feature_set)
             dto = FullSingleLongCycleDto.Serializer(results, many=True).data
             return JsonResponse(dto, safe=False)
         return exec()

@@ -143,7 +143,7 @@ def do_limit_buy(client: Client, symbol: str, price: float, quantity: float, id:
 
     buy_order_filled = False
     buy_order_cancelled = False
-    max_fill_attempt_duration_seconds = 30
+    max_fill_attempt_duration_seconds = 15
     counter_start = datetime.now()
 
     # loop until the whole order is done

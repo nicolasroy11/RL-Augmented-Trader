@@ -69,5 +69,18 @@
             },
             "django": true
         },
+        {
+            "name": "Django Fixtures",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/services/manage.py",
+            "args": [
+                "load_fixtures"
+            ],
+            "env": {
+                "PYTHONPATH": "."
+            },
+            "django": true
+        }
     ]
 }

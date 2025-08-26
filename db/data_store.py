@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from binance.client import Client
+# from binance.client import Client
 import duckdb
 from datetime import datetime, timezone
 import time
@@ -9,7 +9,7 @@ from helpers import add_bollinger_bands, add_ema, add_macd, add_rsi, connection_
 import runtime_settings
 
 
-client = Client(tld='com')
+client = runtime_settings.write_client
 store_frequency_secs = runtime_settings.DATA_FREQUENCY_SECS
 
 

@@ -1,11 +1,11 @@
-from typing import List
+from typing import Dict, List
 from uuid import UUID
 import pandas as pd
 from RL.playground.stochastic.actor_critic import ActorCritic
 from RL.playground.stochastic.policy_gradient import FeedForwardNN
 import runtime_settings
 from services.core.ML.configurations.fixture_config import DEFAULT_FEATURE_SET_ID, CONFIG_UUIDS
-from services.core.models import FeatureSet, RunConfiguration, TickData, TrainingSession
+from services.core.models import FeatureSet, Hyperparameter, MLModel, RunConfiguration, TickData, TrainingSession
 
 import random
 import torch.nn as nn
@@ -22,41 +22,86 @@ DATA_TABLE_NAME = TickData._meta.db_table
 
 class RLRepository:
 
-    def run_ppo(self, window_size=runtime_settings.DATA_TICKS_WINDOW_LENGTH, num_episodes=100, gamma=0.99, lr=1e-4, clip_epsilon=0.2, ppo_epochs=4, batch_size=64, feature_set_id: UUID = None) -> PolicyGradientResultsDto:
+    def run_ppo(self, window_size=runtime_settings.DATA_TICKS_WINDOW_LENGTH, num_episodes=100, gamma=0.99, lr=1e-4, clip_epsilon=0.2, ppo_epochs=4, batch_size=64, feature_set_id: UUID = None):
         session = TrainingSession()
         session.num_episodes = num_episodes
-        if not feature_set_id: feature_set_id = DEFAULT_FEATURE_SET_ID
-        session.feature_set = FeatureSet.objects.get(id=feature_set_id)
         run_config = RunConfiguration.objects.get(id=CONFIG_UUIDS[Environment])
         session.run_configuration = run_config
+        if not feature_set_id: feature_set_id = DEFAULT_FEATURE_SET_ID
+        session.feature_set = FeatureSet.objects.get(id=feature_set_id)
         
         queryset = TickData.objects.order_by('timestamp').all()
-        data_chunks = self.get_valid_data_chunks(queryset, window_size=window_size, min_windows=10)
-        if not data_chunks:
+        self.data_chunks = self.get_valid_data_chunks(queryset, window_size=window_size, min_windows=10)
+        if not self.data_chunks:
             raise ValueError("No valid chunks found with enough rows.")
+        
+        session.save()
+        session.data_runs.set(list(self.data_chunks.keys()))
+        self.session = session
 
+        model = MLModel()
+        model.feature_set = session.feature_set
+        model.run_configuration = session.run_configuration
+        model.save()
+        self.model = model
+
+        hp = Hyperparameter()
+        hp.ml_model = model
+        hp.key = 'lr'
+        hp.value = lr
+        hp.save()
+
+        hp = Hyperparameter()
+        hp.ml_model = model
+        hp.key = 'gamma'
+        hp.value = gamma
+        hp.save()
+
+        hp = Hyperparameter()
+        hp.ml_model = model
+        hp.key = 'clip_epsilon'
+        hp.value = clip_epsilon
+        hp.save()
+
+        hp = Hyperparameter()
+        hp.ml_model = model
+        hp.key = 'ppo_epochs'
+        hp.value = ppo_epochs
+        hp.save()
+
+        hp = Hyperparameter()
+        hp.ml_model = model
+        hp.key = 'batch_size'
+        hp.value = batch_size
+        hp.save()
+        
         input_dim = session.feature_set.get_feature_vector_size()
-        policy = ActorCritic(input_dim, action_dim=3)
-        optimizer = optim.Adam(policy.parameters(), lr=lr)
+        self.policy = ActorCritic(input_dim, action_dim=3)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
 
+        self._run_ppo(num_episodes=100, gamma=0.99, clip_epsilon=0.2, ppo_epochs=4, batch_size=64)
+        
+
+    def _run_ppo(self, num_episodes=100, gamma=0.99, clip_epsilon=0.2, ppo_epochs=4, batch_size=64) -> PolicyGradientResultsDto:
         all_episode_metrics: List[EpisodeResultsDto] = []
 
         for episode_number in range(num_episodes):
             print(f"\n=== Starting Episode {episode_number} ===")
-            random.shuffle(data_chunks) # data chunks should be queued in different order each episode
+            data_chunk_list = list(self.data_chunks.values())
+            random.shuffle(data_chunk_list) # data chunks should be queued in different order each episode
 
             episode_states, episode_actions, episode_log_probs, episode_rewards, episode_values = [], [], [], [], []
             cumulative_pnl = 0.0
             episode_pnls = []
 
-            for chunk in data_chunks:
-                env = Environment(tick_df=chunk, feature_set=session.feature_set)
+            for chunk in data_chunk_list:
+                env = Environment(tick_df=chunk[:300], feature_set=self.session.feature_set)
                 state = env.normalized_reset()
                 done = False
 
                 while not done:
                     state_tensor = torch.tensor(state, dtype=torch.float32).flatten().unsqueeze(0)
-                    logits, value = policy(state_tensor)
+                    logits, value = self.policy(state_tensor)
                     dist = torch.distributions.Categorical(logits=logits)
                     action = dist.sample()
                     log_prob = dist.log_prob(action)
@@ -106,7 +151,7 @@ class RLRepository:
                     batch_advantages = advantages[i:i+batch_size]
                     batch_log_probs_old = log_probs_old[i:i+batch_size]
 
-                    logits, value_pred = policy(batch_states)
+                    logits, value_pred = self.policy(batch_states)
                     dist = torch.distributions.Categorical(logits=logits)
                     log_probs_new = dist.log_prob(batch_actions)
 
@@ -117,9 +162,9 @@ class RLRepository:
                     critic_loss = nn.MSELoss()(value_pred.squeeze(), batch_returns)
                     loss = actor_loss + 0.5 * critic_loss
 
-                    optimizer.zero_grad()
+                    self.optimizer.zero_grad()
                     loss.backward()
-                    optimizer.step()
+                    self.optimizer.step()
 
             # --- EPISODE-LEVEL METRICS ---
             episode_pnls_array = np.array(episode_pnls)
@@ -127,7 +172,7 @@ class RLRepository:
             drawdowns = running_max - episode_pnls_array
             max_drawdown = drawdowns.max() if len(drawdowns) > 0 else 0.0
             final_pnl = episode_pnls_array[-1] if len(episode_pnls_array) > 0 else 0.0
-            buy_and_hold_pnl = sum(chunk.iloc[-1]['price'] - chunk.iloc[0]['price'] for chunk in data_chunks)
+            buy_and_hold_pnl = sum(chunk.iloc[-1]['price'] - chunk.iloc[0]['price'] for chunk in data_chunk_list)
             step_returns = np.diff(episode_pnls_array)
             sharpe_ratio = (step_returns.mean() / (step_returns.std() + 1e-9)) * np.sqrt(252) if len(step_returns) > 0 else 0.0
 
@@ -143,17 +188,17 @@ class RLRepository:
 
             all_episode_metrics.append(episode_metrics)
 
-            model_path = f"pth_files/trained_ppo_{episode_number}_.pth"
-            torch.save(policy.state_dict(), model_path)
+            model_path = f"pth_files/{self.model.id}_{episode_number}.pth"
+            torch.save(self.policy.state_dict(), model_path)
             print(f"Trained policy saved to {model_path}")
             print(f"Episode {episode_number} finished. Final PnL: {final_pnl:.2f}, Buy-and-hold: {buy_and_hold_pnl:.2f}, Max Drawdown: {max_drawdown:.2f}, Sharpe: {sharpe_ratio:.2f}")
 
         results = PolicyGradientResultsDto()
         results.episode_results = all_episode_metrics
         return results
+    
 
-
-    def get_valid_data_chunks(self, queryset: QuerySet[TickData], window_size: int, min_windows: int = 10) -> List[pd.DataFrame]:
+    def get_valid_data_chunks(self, queryset: QuerySet[TickData], window_size: int, min_windows: int = 10) -> Dict[UUID, List[pd.DataFrame]]:
         """
         Convert a Django ORM queryset of ticks into a list of contiguous DataFrames (regimes),
         splitting whenever a gap > 1 minute occurs between ticks.
@@ -176,12 +221,13 @@ class RLRepository:
         split_indices: List[int] = df.index[df['gap'] > pd.Timedelta(minutes=1)].tolist()
         split_indices = [0] + split_indices + [len(df)]
 
-        chunks: List[pd.DataFrame] = []
+        chunks: Dict[UUID, List[pd.DataFrame]] = {}
         for start, end in zip(split_indices[:-1], split_indices[1:]):
             chunk_df: pd.DataFrame = df.iloc[start:end].copy()
             chunk_df.drop(columns=['gap'], inplace=True)
             if len(chunk_df) >= window_size * min_windows:
-                chunks.append(chunk_df.reset_index(drop=True))
+                run_id = chunk_df.iloc[0]['data_run_id']
+                chunks[run_id] = chunk_df.reset_index(drop=True)
 
         return chunks
 

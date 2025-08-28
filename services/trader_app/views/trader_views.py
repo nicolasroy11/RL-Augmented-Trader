@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from services.core.dtos.full_single_long_cycle_dto import FullSingleLongCycleDto
 from services.decorators.decorators.view_decorator import View
 from services.decorators.decorators.view_class_decorator import ViewClass
-from services.trader_app.repositories.trader_repository import TraderRepository
+from services.core.ML.configurations.PPO_flattened_history.trade import TraderRepository
 
 trader_repo = TraderRepository()
 

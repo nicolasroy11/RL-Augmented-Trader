@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from data_app import urls as data_app_urls
-from rl_app import urls as rl_app_urls
+from trainer_app import urls as rl_app_urls
 from trader_app import urls as trader_app_urls
 from django.urls import include, path
 

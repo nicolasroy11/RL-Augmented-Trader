@@ -1,6 +1,7 @@
 import uuid
 from django.core.management.base import BaseCommand
 from binance.enums import KLINE_INTERVAL_1MINUTE
+from services.core.ML.configurations.fixture_config import CONFIG_UUIDS, DEFAULT_FEATURE_SET_ID
 from services.core.models import (
     EMA,
     MACD,
@@ -10,6 +11,7 @@ from services.core.models import (
     FeatureSet,
     DerivedFeature,
     DerivedfeatureSetMapping,
+    RunConfiguration,
 )
 
 short_ema_length = 7
@@ -20,6 +22,7 @@ short_rsi_length = 5
 mid_rsi_length = 7
 long_rsi_length = 12
 bollinger_length = 14
+
 
 DERIVED_FEATURE_UUIDS = {
     
@@ -116,7 +119,7 @@ class Command(BaseCommand):
 
         # FeatureSet
         feature_set, _ = FeatureSet.objects.get_or_create(
-            id=uuid.UUID("33333333-3333-3333-3333-333333333333"),
+            id=DEFAULT_FEATURE_SET_ID,
             defaults={
                 "name": "default",
                 "base_observation_set_id": base_obs_set.id,
@@ -140,3 +143,16 @@ class Command(BaseCommand):
             )
 
         self.stdout.write(self.style.SUCCESS("Fixture data created successfully!"))
+
+
+        # RunConfiguration
+        for config_class, config_uuid in CONFIG_UUIDS.items():
+            RunConfiguration.objects.get_or_create(
+                id=config_uuid,
+                defaults={
+                    "name": config_class.__name__,
+                    "description": config_class.__str__(),
+                },
+            )
+
+        self.stdout.write(self.style.SUCCESS("RunConfiguration fixtures created successfully!"))

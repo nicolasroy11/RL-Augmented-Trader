@@ -8,7 +8,7 @@ from drf_yasg import openapi
 from drf_yasg.generators import OpenAPISchemaGenerator
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import api_view
-from services.rl_app.views.rl_views import RLViews
+from services.trainer_app.views.rl_views import RLViews
 
 
 class BothHttpAndHttpsSchemaGenerator(OpenAPISchemaGenerator):

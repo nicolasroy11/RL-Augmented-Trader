@@ -310,7 +310,7 @@ class MLModel(models.Model):
     def __str__(self):
         return f"{self.run_configuration.str()}"
     
-    id = models.UUIDField(primary_key=True, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     feature_set = models.ForeignKey(FeatureSet, on_delete=models.CASCADE, null=False)
     run_configuration = models.ForeignKey(RunConfiguration, on_delete=models.DO_NOTHING, null=False)
 

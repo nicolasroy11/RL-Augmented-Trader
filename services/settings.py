@@ -51,7 +51,7 @@ INSTALLED_APPS = [
 
 INSTALLED_APPS.append("core.apps.CoreConfig")
 INSTALLED_APPS.append("data_app.apps.DataApp")
-INSTALLED_APPS.append("rl_app.apps.RlAppConfig")
+INSTALLED_APPS.append("trainer_app.apps.TrainersConfig")
 INSTALLED_APPS.append("trader_app.apps.TradersConfig")
 
 MIDDLEWARE = [

@@ -259,14 +259,35 @@ class DerivedfeatureSetMapping(models.Model):
         return f"{self.feature_set.name} - {self.derived_feature.method_name}"
 
 
+class RunConfiguration(models.Model):
+    class Meta:
+        db_table = f'"public"."run_configurations"'
+
+    id = models.UUIDField(primary_key=True, editable=False)
+    name = models.CharField(max_length=150, null=True)
+    description = models.CharField(max_length=250, null=True)
+    blocking = models.BooleanField(null=False)
+
+
 class TradingSession(models.Model):
     class Meta:
         db_table = f'"public"."trading_sessions"'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, verbose_name='trading_session_id', null=False)
-    data_run = models.ForeignKey(DataRun, on_delete=models.CASCADE, null=False)
+    data_run = models.ForeignKey(DataRun, on_delete=models.DO_NOTHING, null=True)
     feature_set = models.ForeignKey(FeatureSet, on_delete=models.CASCADE, null=False)
-    blocking = models.BooleanField(null=False)
+    run_configuration = models.ForeignKey(RunConfiguration, on_delete=models.CASCADE, null=True)
+
+
+class TrainingSession(models.Model):
+    class Meta:
+        db_table = f'"public"."training_sessions"'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, verbose_name='training_session_id', null=False)
+    num_episodes = models.IntegerField()
+    data_runs = models.ManyToManyField(DataRun)
+    feature_set = models.ForeignKey(FeatureSet, on_delete=models.CASCADE, null=False)
+    run_configuration = models.ForeignKey(RunConfiguration, on_delete=models.CASCADE, null=True)
 
 
 class Transaction(models.Model):
@@ -280,3 +301,30 @@ class Transaction(models.Model):
     strike_price = models.FloatField()
     base_amount = models.FloatField()
 
+
+class MLModel(models.Model):
+    class Meta:
+        db_table = f'"public"."ml_models"'
+        db_table_comment = 'The id on this table will be the name of the pickle file.'
+
+    def __str__(self):
+        return f"{self.run_configuration.str()}"
+    
+    id = models.UUIDField(primary_key=True, editable=False)
+    feature_set = models.ForeignKey(FeatureSet, on_delete=models.CASCADE, null=False)
+    run_configuration = models.ForeignKey(RunConfiguration, on_delete=models.DO_NOTHING, null=False)
+
+
+class Hyperparameter(models.Model):
+    class Meta:
+        db_table = f'"public"."hyperparameters"'
+        unique_together = ("ml_model", "key")  # each param unique per model
+
+    def __str__(self):
+        return f"{self.ml_model.id}: {self.key}={self.value}"
+    
+    ml_model = models.ForeignKey(MLModel, related_name="hyperparameters", on_delete=models.CASCADE)
+    key = models.CharField(max_length=100)   # e.g. "clip_ratio"
+    value = models.CharField(max_length=255) # always stored as string
+
+    

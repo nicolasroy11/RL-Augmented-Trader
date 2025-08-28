@@ -10,7 +10,7 @@ from binance.enums import SIDE_BUY, SIDE_SELL
 import numpy as np
 
 from services.core.models import FeatureSet, TickData, TickProbabilities, TradingSession, Transaction
-from services.rl_app.environments.base_environment import BaseTradingEnvironment
+from services.core.ML.configurations.PPO_flattened_history.environment import Environment
 from services.data_app.repositories.data_repository import DataRepository
 
 
@@ -60,7 +60,6 @@ class TraderRepository():
         trading_session = TradingSession()
         self.data_repo = DataRepository(feature_set_name=feature_set_name)
         trading_session.data_run = self.data_repo.data_run
-        trading_session.blocking = True
         trading_session.feature_set = feature_set
         trading_session.save()
         self.trading_session = trading_session
@@ -76,7 +75,7 @@ class TraderRepository():
             print(f"latest_window_data: {len(latest_window_data)}")
             return
         
-        env = BaseTradingEnvironment(tick_list=latest_window_data, feature_set=self.feature_set)
+        env = Environment(tick_list=latest_window_data, feature_set=self.feature_set)
         action_probs = env.get_inference_action_probs()
 
         self.last_tick = latest_window_data[-1]

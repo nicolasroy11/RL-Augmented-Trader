@@ -9,14 +9,19 @@ from services.core.services.feature_service import DerivedFeatureMethods
 from services.types import Actions
 
 
-class BaseTradingEnvironment:
+class Environment:
 
-    def __init__(self, feature_set: FeatureSet, tick_df: pd.DataFrame = None, tick_list: List[TickData] = None):
+    def __str__():
+        return 'A PPO with n-tick history flattened to a 1-D vector'
+
+    def __init__(self, feature_set: FeatureSet, tick_df: pd.DataFrame = None, tick_list: List[TickData] = None, initial_cash=1000000):
+        self.initial_cash = initial_cash
+        self.cash = initial_cash
         self.feature_set = feature_set
         self.feature_set_flat_vector_size = feature_set.get_feature_vector_size()
         self.load_inference_policy()
-        if not tick_df and not tick_list:
-            raise ValueError('need to pass in at tick_df or tick_list!')
+        # if not tick_df and not tick_list:
+        #     raise ValueError('need to pass in at tick_df or tick_list!')
         self.window_size = runtime_settings.DATA_TICKS_WINDOW_LENGTH
         if tick_list:
             tick_df = TickData.list_to_env_dataframe(tick_list=tick_list)
@@ -34,12 +39,6 @@ class BaseTradingEnvironment:
     def reset(self):
         self.current_step = self.window_size
         return self._get_observation()
-
-
-    def _get_observation(self) -> np.ndarray:
-        window = self.data.iloc[self.current_step - self.window_size : self.current_step]
-        window = TickData.remove_non_training_fields_in_df(df=window)
-        return window.to_numpy()
 
 
     def get_normalized_observation(self):
@@ -88,7 +87,7 @@ class BaseTradingEnvironment:
         self.current_step = self.feature_set.window_length
         obs_vector = self.get_normalized_observation()
         with torch.no_grad():
-            state_tensor = torch.tensor(obs_vector, dtype=torch.float32, device=self.policy_device).flatten().unsqueeze(0)
+            state_tensor = self.get_state_tensor(obs_vector=obs_vector)
             logits, _ = self.policy(state_tensor)
             dist = torch.distributions.Categorical(logits=logits)
             probs = dist.probs.squeeze(0).cpu().numpy()
@@ -97,6 +96,11 @@ class BaseTradingEnvironment:
                 Actions.HOLD: float(probs[1]),
                 Actions.BUY: float(probs[2]),
             }
+        
+
+    def get_state_tensor(self, obs_vector: np.ndarray):
+        t = torch.tensor(obs_vector, dtype=torch.float32, device=self.policy_device).flatten().unsqueeze(0)
+        return t
         
 
     def load_inference_policy(self):
@@ -114,10 +118,54 @@ class BaseTradingEnvironment:
         return self.get_normalized_observation()
 
 
-    def step(self, action):
+    def step(self, action: int):
+        """
+        Actions:
+            -1 = Sell
+            0 = Hold
+            1 = Buy
+
+        Position state:
+            self.position: 0 = flat, 1 = long
+            self.entry_price: entry price if long, None if flat
+        """
+        price = self.data.iloc[self.current_step]['price']
+        realized_pnl = 0.0
+
+        # === Execute action ===
+        if action == 1:  # BUY
+            if self.position == 0:  # only open a new position if flat
+                self.position = 1
+                self.entry_price = price
+
+        elif action == -1:  # SELL
+            if self.position == 1:  # only sell if long
+                realized_pnl = price - self.entry_price
+                self.cash += realized_pnl  # accumulate realized gains/losses
+                self.position = 0
+                self.entry_price = None
+
+        # HOLD (0) does nothing
+
+        # === Advance environment ===
         self.current_step += 1
         done = self.current_step >= len(self.data)
-        obs = self._get_observation() if not done else None
-        reward = 0.0
-        info = {}
+
+        # === Get next observation ===
+        obs = self.get_normalized_observation() if not done else None
+
+        # === Reward: realized PnL only ===
+        reward = realized_pnl
+
+        # === Info dict for debugging/logging ===
+        unrealized_pnl = (price - self.entry_price) if self.position == 1 else 0.0
+        info = {
+            "cash": self.cash,
+            "position": self.position,
+            "entry_price": self.entry_price if self.entry_price else 0.0,
+            "price": price,
+            "realized_pnl": realized_pnl,
+            "unrealized_pnl": unrealized_pnl,
+        }
+
         return obs, reward, done, info

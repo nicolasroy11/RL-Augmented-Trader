@@ -1,23 +1,16 @@
 import numpy as np
 import pandas as pd
-from services.rl_app.environments.base_environment import BaseTradingEnvironment
+from services.core.ML.configurations.PPO_flattened_history.environment import Environment
+from services.core.models import FeatureSet
 
-class StochasticSingleBuy(BaseTradingEnvironment):
-    def __init__(self, data: pd.DataFrame, window_size=10, initial_cash=1000000):
-        super().__init__(data)
+class StochasticSingleBuy(Environment):
+    def __init__(self, feature_set: FeatureSet, tick_df: pd.DataFrame, initial_cash=1000000):
+        super().__init__(tick_df=tick_df, feature_set=feature_set)
         self.initial_cash = initial_cash
         self.cash = initial_cash
         self.holding = False
         self.buy_price = 0.0
 
-    def reset(self) -> np.ndarray:
-        self.cash = self.initial_cash
-        if self.initial_cash < self.data.iloc[self.window_size]['price']:
-            raise ValueError("Initial cash too low to afford any asset.")
-        self.holding = False
-        self.buy_price = 0.0
-        self.current_step = self.window_size
-        return self._get_observation()
 
     def step(self, action: int):
         """

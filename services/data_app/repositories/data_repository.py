@@ -32,6 +32,7 @@ class DataRepository():
         data_run = DataRun()
         data_run.com_or_us = runtime_settings.COM_OR_US
         data_run.is_testnet = runtime_settings.IS_TESTNET
+        data_run.is_futures = runtime_settings.IS_FUTURES
         data_run.base_asset = runtime_settings.BASE_ASSET
         data_run.quote_asset = runtime_settings.QUOTE_ASSET
         data_run.save()
@@ -54,8 +55,12 @@ class DataRepository():
     def get_tick_data(self):
         tick = TickData()
         tick.timestamp = datetime.now(timezone.utc)
-        ticker = runtime_settings.read_only_client.get_symbol_ticker(symbol=SYMBOL)
-        tick.price = float(ticker['price'])
+        if self.data_run.is_futures:
+            ticker = runtime_settings.read_only_client.futures_ticker(symbol=SYMBOL)
+            tick.price = float(ticker['lastPrice'])
+        else:
+            ticker = runtime_settings.read_only_client.get_symbol_ticker(symbol=SYMBOL)
+            tick.price = float(ticker['price'])
 
         fs = self.feature_set
         base_set = fs.base_observation_set

@@ -6,7 +6,6 @@ from services.decorators.decorators.view_decorator import View
 from services.decorators.decorators.view_class_decorator import ViewClass
 from django.views.decorators.csrf import csrf_exempt
 from services.data_app.repositories.data_repository import DataRepository
-data_repo = DataRepository()
 
 
 @ViewClass(
@@ -27,6 +26,7 @@ class Ticks:
     @csrf_exempt
     def start_data_collection(req: WSGIRequest):
         def exec():
+            data_repo = DataRepository()
             data_repo.start_data_collection()
             return JsonResponse(data="Data collection started", safe=False)
         return exec()
@@ -39,6 +39,7 @@ class Ticks:
     )
     def get_all(req: WSGIRequest):
         def exec():
+            data_repo = DataRepository()
             ticks = data_repo.get_ticks_from_duckdb()
             print(f"Fetched {len(ticks)} ticks from the database. Approximately {len(ticks) * 5 / 60:.2f} minutes of data.")
             dto = TickDto.Serializer(ticks, many=True).data
@@ -54,6 +55,7 @@ class Ticks:
     )
     def save_archives_to_pg(req: WSGIRequest):
         def exec():
+            data_repo = DataRepository()
             ticks = data_repo.save_ticks_to_pg()
             dto = TickDto.Serializer(ticks, many=True).data
             return JsonResponse(dto, safe=False)

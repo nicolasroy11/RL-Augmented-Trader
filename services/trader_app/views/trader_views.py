@@ -5,8 +5,6 @@ from services.decorators.decorators.view_decorator import View
 from services.decorators.decorators.view_class_decorator import ViewClass
 from services.core.ML.configurations.PPO_flattened_history.trade import TraderRepository
 
-trader_repo = TraderRepository()
-
 
 @ViewClass(
     url='traders/'
@@ -28,6 +26,7 @@ class TraderViews:
     def run_single_buy_ppo_trader(req: WSGIRequest):
         feature_set = req.GET.get('feature_set')
         def exec():
+            trader_repo = TraderRepository()
             results = trader_repo.run_single_buy_ppo_trader(feature_set_name=feature_set)
             dto = FullSingleLongCycleDto.Serializer(results, many=True).data
             return JsonResponse(dto, safe=False)

@@ -43,6 +43,7 @@ class DataRun(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, verbose_name='data_run_id', null=False)
     com_or_us = models.CharField(max_length=3, choices=[('com', 'com'), ('us', 'us')], null=False)
     is_testnet = models.BooleanField(null=False)
+    is_futures = models.BooleanField(null=False)
     base_asset = models.CharField(max_length=7, null=False)
     quote_asset = models.CharField(max_length=7, null=False)
     window_length = models.IntegerField(null=False, default=runtime_settings.DATA_TICKS_WINDOW_LENGTH)

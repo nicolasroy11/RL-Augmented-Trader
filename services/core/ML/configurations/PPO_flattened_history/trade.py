@@ -4,12 +4,13 @@ from typing import Dict, List
 from classes import Balances, OrderReport
 from helpers import cancel_all_orders, do_limit_buy, do_limit_sell, do_market_sell, get_balances_snapshot, get_instant_notional_minimum
 import runtime_settings
+from services.core.ML.configurations.fixture_config import CONFIG_UUIDS
 from services.core.dtos.full_single_long_cycle_dto import FullSingleLongCycleDto
 from services.types import Actions
 from binance.enums import SIDE_BUY, SIDE_SELL
 import numpy as np
 
-from services.core.models import FeatureSet, TickData, TickProbabilities, TradingSession, Transaction
+from services.core.models import FeatureSet, RunConfiguration, TickData, TickProbabilities, TradingSession, Transaction
 from services.core.ML.configurations.PPO_flattened_history.environment import Environment
 from services.data_app.repositories.data_repository import DataRepository
 
@@ -61,6 +62,8 @@ class TraderRepository():
         self.data_repo = DataRepository(feature_set_name=feature_set_name)
         trading_session.data_run = self.data_repo.data_run
         trading_session.feature_set = feature_set
+        run_config = RunConfiguration.objects.get(id=CONFIG_UUIDS[Environment])
+        trading_session.run_configuration = run_config
         trading_session.save()
         self.trading_session = trading_session
         self.loop_number = 0

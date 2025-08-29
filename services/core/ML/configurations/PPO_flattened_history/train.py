@@ -79,10 +79,10 @@ class RLRepository:
         self.policy = ActorCritic(input_dim, action_dim=3)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
 
-        self._run_ppo(num_episodes=100, gamma=0.99, clip_epsilon=0.2, ppo_epochs=4, batch_size=64)
+        self._run_ppo(num_episodes, gamma, clip_epsilon, ppo_epochs, batch_size)
         
 
-    def _run_ppo(self, num_episodes=100, gamma=0.99, clip_epsilon=0.2, ppo_epochs=4, batch_size=64) -> PolicyGradientResultsDto:
+    def _run_ppo(self, num_episodes, gamma, clip_epsilon, ppo_epochs, batch_size) -> PolicyGradientResultsDto:
         all_episode_metrics: List[EpisodeResultsDto] = []
 
         for episode_number in range(num_episodes):
@@ -95,7 +95,7 @@ class RLRepository:
             episode_pnls = []
 
             for chunk in data_chunk_list:
-                env = Environment(tick_df=chunk[:300], feature_set=self.session.feature_set)
+                env = Environment(tick_df=chunk, feature_set=self.session.feature_set)
                 state = env.normalized_reset()
                 done = False
 

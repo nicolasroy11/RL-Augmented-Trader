@@ -90,7 +90,6 @@ class Migration(migrations.Migration):
                 (
                     "run_configuration",
                     models.ForeignKey(
-                        null=True,
                         on_delete=django.db.models.deletion.CASCADE,
                         to="core.runconfiguration",
                     ),

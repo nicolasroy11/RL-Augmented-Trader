@@ -276,7 +276,7 @@ class TradingSession(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, verbose_name='trading_session_id', null=False)
     data_run = models.ForeignKey(DataRun, on_delete=models.DO_NOTHING, null=True)
     feature_set = models.ForeignKey(FeatureSet, on_delete=models.CASCADE, null=False)
-    run_configuration = models.ForeignKey(RunConfiguration, on_delete=models.CASCADE, null=True)
+    run_configuration = models.ForeignKey(RunConfiguration, on_delete=models.CASCADE, null=False)
 
 
 class TrainingSession(models.Model):

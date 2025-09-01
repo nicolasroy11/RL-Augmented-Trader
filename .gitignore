@@ -163,3 +163,5 @@ cython_debug/
 #.idea/
 runtime_settings.py
 /pth_files
+/training_file_logs
+/services/core/ML/configurations/notebooks/json_training_logs

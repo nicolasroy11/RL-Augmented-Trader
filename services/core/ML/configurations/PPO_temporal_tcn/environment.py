@@ -302,6 +302,8 @@ class Environment:
             SELL (-1)-> HOLD (no pyramiding)
         - HOLD (0) always keeps the current position.
         """
+        FEE_RATE = 0.0002
+        TRADE_QTY = 1.0
         price = float(self.data.iloc[self.current_step]['price'])
         realized = 0.0
 
@@ -312,7 +314,8 @@ class Environment:
                 self.entry_price = price
             elif self.position == -1:
                 # close short
-                realized = float(self.entry_price) - price
+                fee_on_close = 2 * float(self.data.iloc[self.current_step]['price']) * TRADE_QTY * FEE_RATE
+                realized = (float(self.entry_price) - price) * TRADE_QTY - fee_on_close
                 self.cash += realized
                 self.position = 0
                 self.entry_price = None
@@ -325,7 +328,8 @@ class Environment:
                 self.entry_price = price
             elif self.position == 1:
                 # close long
-                realized = price - float(self.entry_price)
+                fee_on_close = 2 * float(self.data.iloc[self.current_step]['price']) * TRADE_QTY * FEE_RATE
+                realized = (price - float(self.entry_price)) * TRADE_QTY - fee_on_close
                 self.cash += realized
                 self.position = 0
                 self.entry_price = None

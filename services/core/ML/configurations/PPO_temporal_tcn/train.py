@@ -62,7 +62,7 @@ class RLRepository:
         clip_epsilon=0.2,
         ppo_epochs=4,
         batch_size=64,
-        ent_coef=0.01,
+        ent_coef=0.05,
         feature_set_id: UUID = None,
         is_futures = False
     ):
@@ -277,7 +277,7 @@ class RLRepository:
 
     def get_valid_data_chunks(self, queryset: QuerySet[TickData], window_size: int, min_windows: int = 10) -> Dict[UUID, pd.DataFrame]:
         """
-        Convert ticks into contiguous DataFrames (regimes), splitting when gap > 1 minute.
+        Separate ticks chunks into contiguous DataFrames (regimes), splitting when gap > 1 minute.
         Keeps chunks with at least `window_size * min_windows` rows.
         Returns a dict keyed by data_run_id -> chunk dataframe.
         """

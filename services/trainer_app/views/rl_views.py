@@ -5,6 +5,7 @@ from services.core.dtos.policy_gradient_results_dto import PolicyGradientResults
 from services.decorators.decorators.view_decorator import View
 from services.decorators.decorators.view_class_decorator import ViewClass
 from services.core.ML.configurations.PPO_flattened_history.train import RLRepository
+from services.core.ML.configurations.PPO_temporal_tcn.train import RLRepository as PPO_TCN_Repo
 
 
 @ViewClass(
@@ -64,6 +65,24 @@ class RLViews:
         def exec():
             rl_repo = RLRepository()
             results = rl_repo.run_ppo(window_size=runtime_settings.DATA_TICKS_WINDOW_LENGTH, num_episodes=100)
+            dto = PolicyGradientResultsDto.Serializer(results).data
+            return JsonResponse(dto)
+        return exec()
+    
+    
+    @View(
+        path='run_ppo_tcn_futures',
+        http_method='POST',
+        return_type=PolicyGradientResultsDto.Serializer(),
+        description='Run policy gradient algorithm and return results',
+        include_in_swagger=True
+    )
+    def run_ppo_tcn_futures(req: WSGIRequest):
+        feature_set = req.GET.get('feature_set')
+        # num_episodes=100, gamma=0.99, lr=1e-4, clip_epsilon=0.2, ppo_epochs=4, batch_size=64
+        def exec():
+            rl_repo = PPO_TCN_Repo()
+            results = rl_repo.run_ppo(window_size=runtime_settings.DATA_TICKS_WINDOW_LENGTH, num_episodes=100, is_futures=True)
             dto = PolicyGradientResultsDto.Serializer(results).data
             return JsonResponse(dto)
         return exec()

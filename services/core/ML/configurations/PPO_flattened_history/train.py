@@ -5,6 +5,7 @@ from RL.playground.stochastic.actor_critic import ActorCritic
 from RL.playground.stochastic.policy_gradient import FeedForwardNN
 import runtime_settings
 from services.core.ML.configurations.fixture_config import DEFAULT_FEATURE_SET_ID, CONFIG_UUIDS
+from services.core.ML.helpers import json_log_training_progression
 from services.core.models import FeatureSet, Hyperparameter, MLModel, RunConfiguration, TickData, TrainingSession
 
 import random
@@ -22,7 +23,7 @@ DATA_TABLE_NAME = TickData._meta.db_table
 
 class RLRepository:
 
-    def run_ppo(self, window_size=runtime_settings.DATA_TICKS_WINDOW_LENGTH, num_episodes=100, gamma=0.99, lr=1e-4, clip_epsilon=0.2, ppo_epochs=4, batch_size=64, feature_set_id: UUID = None):
+    def run_ppo(self, window_size=runtime_settings.DATA_TICKS_WINDOW_LENGTH, num_episodes=100, gamma=0.97, lr=3e-4, clip_epsilon=0.2, ppo_epochs=4, batch_size=64, feature_set_id: UUID = None):
         session = TrainingSession()
         session.num_episodes = num_episodes
         run_config = RunConfiguration.objects.get(id=CONFIG_UUIDS[Environment])
@@ -90,12 +91,12 @@ class RLRepository:
             data_chunk_list = list(self.data_chunks.values())
             random.shuffle(data_chunk_list) # data chunks should be queued in different order each episode
 
-            episode_states, episode_actions, episode_log_probs, episode_rewards, episode_values = [], [], [], [], []
+            episode_states, episode_actions, episode_log_probs, episode_rewards, episode_values, episode_action_probs = [], [], [], [], [], []
             cumulative_pnl = 0.0
-            episode_pnls = []
+            running_episode_pnls = []
 
             for chunk in data_chunk_list:
-                env = Environment(tick_df=chunk, feature_set=self.session.feature_set)
+                env = Environment(tick_df=chunk[:300], feature_set=self.session.feature_set)
                 state = env.normalized_reset()
                 done = False
 
@@ -114,9 +115,11 @@ class RLRepository:
                     episode_log_probs.append(log_prob.detach())
                     episode_values.append(value.detach())
                     episode_rewards.append(torch.tensor([reward], dtype=torch.float32))
+                    episode_action_probs.append(list(dist.probs.detach().numpy().flatten()))
+
 
                     cumulative_pnl += reward
-                    episode_pnls.append(cumulative_pnl)
+                    running_episode_pnls.append(cumulative_pnl)
                     state = next_state
 
                     print(
@@ -167,7 +170,7 @@ class RLRepository:
                     self.optimizer.step()
 
             # --- EPISODE-LEVEL METRICS ---
-            episode_pnls_array = np.array(episode_pnls)
+            episode_pnls_array = np.array(running_episode_pnls)
             running_max = np.maximum.accumulate(episode_pnls_array)
             drawdowns = running_max - episode_pnls_array
             max_drawdown = drawdowns.max() if len(drawdowns) > 0 else 0.0
@@ -185,6 +188,7 @@ class RLRepository:
             episode_metrics.max_drawdown = max_drawdown
             episode_metrics.buy_and_hold_pnl = buy_and_hold_pnl
             episode_metrics.sharpe_ratio = sharpe_ratio
+            episode_metrics.action_probs = episode_action_probs
 
             all_episode_metrics.append(episode_metrics)
 
@@ -193,6 +197,7 @@ class RLRepository:
             print(f"Trained policy saved to {model_path}")
             print(f"Episode {episode_number} finished. Final PnL: {final_pnl:.2f}, Buy-and-hold: {buy_and_hold_pnl:.2f}, Max Drawdown: {max_drawdown:.2f}, Sharpe: {sharpe_ratio:.2f}")
 
+        json_log_training_progression(all_episode_metrics, f'PPO_flattened_{self.session.id}')
         results = PolicyGradientResultsDto()
         results.episode_results = all_episode_metrics
         return results
@@ -230,7 +235,6 @@ class RLRepository:
                 chunks[run_id] = chunk_df.reset_index(drop=True)
 
         return chunks
-
 
 
     def run_policy_gradient(self, window_size=runtime_settings.DATA_TICKS_WINDOW_LENGTH, num_episodes=100, gamma=0.95, lr=1e-3) -> PolicyGradientResultsDto:

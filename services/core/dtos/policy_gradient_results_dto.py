@@ -10,9 +10,11 @@ class EpisodeResultsDto:
     episode_pnls: List[float]
     running_max: List[float]
     drawdowns: List[float]
+    action_probs: List[List[float]]
     max_drawdown: float
     buy_and_hold_pnl: float
     sharpe_ratio: float
+    prices: List[float]
 
     class Serializer(serializers.Serializer):
         episode_number = serializers.IntegerField()

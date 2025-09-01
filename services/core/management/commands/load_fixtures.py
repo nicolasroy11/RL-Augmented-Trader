@@ -152,6 +152,7 @@ class Command(BaseCommand):
                 defaults={
                     "name": config_class.__name__,
                     "description": config_class.__str__(),
+                    "blocking": True
                 },
             )
 

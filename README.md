@@ -129,11 +129,11 @@ Modify runtime_settings.py to adjust:
 ### Contributing
 - Fork this repo
 
-- Create your feature branch (git checkout -b feature/awesome-thing)
+- Create your feature branch (git checkout -b rlat/awesome-thing)
 
 - Commit your changes (git commit -m 'Add awesome thing')
 
-- Push to the branch (git push origin feature/awesome-thing)
+- Push to the branch (git push origin rlat/awesome-thing)
 
 - Open a Pull Request and set me as the reviewer (nicolasroy11)
 

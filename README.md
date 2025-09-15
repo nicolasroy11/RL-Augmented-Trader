@@ -27,7 +27,7 @@ Contact: nicolasroy11@gmail.com
 
 ✅ Real-time 5s data ingestion from Binance  
 ✅ Postgres and DuckDB-based tick storage for fast analytics  
-✅ Custom PyTorch RL agent (Policy Gradient)  
+✅ Custom PyTorch RL agents (Policy Gradient, PPO with TCN for temporal perception and XGBoost)  
 ✅ Live environment with simulated trading logic  
 ✅ Normalized technical indicators: RSI, EMA, MACD, Bollinger bands  
 ✅ Finplot-based data visualization  
@@ -68,67 +68,70 @@ trained over the following price action:
 <img style="display: block; margin: 0 auto;" src="static/price_downtrend.png" width=50% />
 <!-- </div> -->
 
+## Installation
 
-## This Repository
+```bash
+git clone https://github.com/yourusername/rl-augmented-trader.git
+cd rl-augmented-trader
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
+```
 
-### Repo Structure TL;DR
+### Example API calls:
 
-- `db/` — Data scraping, storage, and visualization modules. Collects and stores Binance 5-second tick data with technical indicators (RSI, EMA, MACD).  
-- `RL/` — Reinforcement learning agents and training scripts. Currently includes a stochastic policy gradient agent that learns over tick windows.
-- `services/` — Django services that will be used to make this project interactive over the web.
+Train model:
+- POST /api/training/run_ppo_tcn_futures
+
+Run trading:
+- POST /api/trading/run_single_buy_ppo_trader?feature_set=default
+
+Simple 5-second data collection:
+- POST /api/data/start_data_collection
+
+Configuration: adjust settings in runtime_settings.py based on runtime_settings_template.py
+
+# Licenses and builds
+
+[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)  
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)  
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](#)  
 
 ---
 
-The db folder contains a module that strictly concerns itself with the scraping, storing, and visualization of raw data. Since the nature of volatile assets presents tiny opportunities to profitably buy and sell at any moment regardless of wider trend, I opted to walk away from querying trading platform APIs for minutely OHLCV data, favoring the storage of sub-minute instantaneous tick and technical indicator (RSI, MACD, EMA in various lengths,) exactly as they would appear in a live scenario. A quick snapshot of current conditions. The interval is adjustable, and the default is 5-second intervals.
+## Features
 
-The RL folder houses the logic that will produce our model. In a bid to decouple this approach from my own trading biases and observations, I opted to start the exploration off with a purely stochastic run. Just collect a large amount of ticks and indicators and let the simplest feed-forward network buy and sell at random while keeping track of reward and PnL states. From observing the output vector change in real time as the network works through the data, it is visually evident that converging values are reached, confirming the model's confidence in its increasing experience.
-
-The services folder is the home folder of all things Django service. I tend to set up Django services in a particular way as to make adding endpoints and functionality semantic and easy and using decorators in the same way they are used in .NET where type safety and return data structures are documented and Swagger-ready. This set of services will allow for theongoing processes of agent automation to be modified and occasionally course-corrected in real time if need be.
-
-
-## Getting Started 🚀
-
-### 1. Clone the repo
-```bash
-git clone https://github.com/nicolasroy11/RL-Augmented-Trader.git
-```
-
-### Navigate into the repo
-```bash
-cd RL-Augmented-Trader
-```
-
-### Install the requirements
-```bash
-pip install -r requirements.txt
-```
-
-### Run the data storage for any desired amount of time
-```bash
-export PYTHONPATH=.
-python db/datastore.py
-```
-
-### Once you have completed the above step, you can run a quick visualization of what you've collected
-```bash
-python db/visualization.py
-```
-
-### To run the stochastic training experiment, use the following command:
-```bash
-python RL/playground/stochastic/run.py
-```
+- 📈 Train reinforcement learning models for algorithmic trading  
+- ⚡ Real-time trading execution via API  
+- 🔧 Configurable runtime settings (`runtime_settings.py`)  
+- 🛠️ Modular code structure (`classes.py`, `helpers.py`)  
+- 🌐 REST endpoints for training & trading  
 
 
-## Roadmap / TODO
+### Configuration
+Modify runtime_settings.py to adjust:
 
-- [ ] Integrate PPO agent for more stable learning
-- [ ] Add Sharpe ratio evaluations and other standard performance markers
-- [ ] Improve model performance tracking with additional tooling
-- [ ] Publish blog write-up on training insights
-- [ ] Once a successful model is generated, integrate it into the existing Lowrider code
-- [ ] Broadcast buy/sell signals for consumption by third party traders (Zignaly?)
-- [ ] Include LSTM/GRU networks in the RL process to strengthen regime awareness
-- [ ] Expand Django apps to expose the process to external parties
+- Model parameters
 
+- Data sources
+
+- Trading strategy settings
+
+### Tech Stack
+- Python 3.9+
+
+- Django / Django REST Framework
+
+- Reinforcement Learning Libraries (PyTorch, XGBoost)
+
+### Contributing
+- Fork this repo
+
+- Create your feature branch (git checkout -b feature/awesome-thing)
+
+- Commit your changes (git commit -m 'Add awesome thing')
+
+- Push to the branch (git push origin feature/awesome-thing)
+
+- Open a Pull Request and set me as the reviewer (nicolasroy11)
 

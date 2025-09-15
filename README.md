@@ -124,6 +124,8 @@ Modify runtime_settings.py to adjust:
 
 - Reinforcement Learning Libraries (PyTorch, XGBoost)
 
+- Soon React for interactive client interface with sockets for realtime chart updates
+
 ### Contributing
 - Fork this repo
 

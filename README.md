@@ -29,7 +29,7 @@ Contact: nicolasroy11@gmail.com
 ✅ Postgres and DuckDB-based tick storage for fast analytics  
 ✅ Custom PyTorch RL agents (Policy Gradient, PPO with TCN for temporal perception and XGBoost)  
 ✅ Live environment with simulated trading logic  
-✅ Normalized technical indicators: RSI, EMA, MACD, Bollinger bands, and Supertrend
+✅ Normalized technical indicators: RSI, EMA, MACD, Bollinger bands, and Supertrend     
 ✅ Finplot-based data visualization  
 ✅ Training insights: logits, action probabilities, PnL tracking    
 ✅ Django apps for visualization and eventually meaningful interaction  

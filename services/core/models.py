@@ -27,6 +27,10 @@ class TrainingFields(models.Model):
     bb_upper = models.FloatField(null=True)
     bb_middle = models.FloatField(null=True)
     bb_lower = models.FloatField(null=True)
+    supertrend_line = models.FloatField(null=True)
+    direction_flag = models.FloatField(null=True)
+    long_stop_line = models.FloatField(null=True)
+    short_stop_line = models.FloatField(null=True)
         
     @staticmethod
     def get_fields():
@@ -179,6 +183,20 @@ class BollingerBands(models.Model):
 
     def __str__(self):
         return f"bband_{self.length}_{self.std_dev}'"
+    
+
+class SuperTrend(models.Model):
+    class Meta:
+        db_table = '"public"."supertrends"'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    length = models.IntegerField()
+    multiplier = models.FloatField()
+    is_sequence = models.BooleanField()
+    base_observation_set = models.ForeignKey(BaseObservationSet, on_delete=models.CASCADE, related_name="strends")
+
+    def __str__(self):
+        return f"strend_{self.length}_{self.multiplier}'"
 
 
 class FeatureSet(models.Model):
@@ -222,6 +240,13 @@ class FeatureSet(models.Model):
         bband: BollingerBands
         for bband in base_set.bbands.all():
             if bband.is_sequence:
+                vector_size += (self.window_length * 3)
+            else:
+                vector_size += 3
+
+        strend: SuperTrend
+        for strend in base_set.strends.all():
+            if strend.is_sequence:
                 vector_size += (self.window_length * 3)
             else:
                 vector_size += 3

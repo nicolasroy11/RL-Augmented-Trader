@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from rest_framework import serializers
 from services.decorators.decorators.dto_class_decorator import Dto
 
@@ -16,6 +16,13 @@ class EpisodeResultsDto:
     sharpe_ratio: float
     prices: List[float]
 
+    validation_pnl: float
+    validation_sharpe: float
+    validation_max_drawdown: float
+    validation_trades: int
+    model_path: Optional[str]
+
+
     class Serializer(serializers.Serializer):
         episode_number = serializers.IntegerField()
         final_pnl = serializers.FloatField()
@@ -28,8 +35,13 @@ class EpisodeResultsDto:
 
 
 @Dto()
-class PolicyGradientResultsDto():
+class PPOTCNTrainingResults:
     episode_results: List[EpisodeResultsDto]
+    holdout_pnl: float
+    holdout_sharpe: float
+    holdout_max_drawdown: float
+    holdout_trades: int
+    best_model_path: Optional[str]
 
     class Serializer(serializers.Serializer):
         episode_results = serializers.ListField(child=EpisodeResultsDto.Serializer())

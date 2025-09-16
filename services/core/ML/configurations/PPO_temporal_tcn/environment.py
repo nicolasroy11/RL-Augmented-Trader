@@ -45,7 +45,7 @@ class TCNActorCriticWithState(nn.Module):
         self.tcn = TCNExtractor(in_feats_ts, hidden=hidden)
         self.actor = nn.Sequential(
             nn.Linear(hidden + state_dim, hidden),
-            nn.Tanh(),
+            nn.Tanh(),      # TODO: activation should be different for different datatypes
             nn.Linear(hidden, action_dim)
         )
         self.critic = nn.Sequential(
@@ -213,6 +213,8 @@ class Environment:
         for m in mappings:
             if m.derived_feature.method_name.startswith('position_'):
                 v = getattr(DerivedFeatureMethods, m.derived_feature.method_name)(self.position, self.entry_price, price_now)
+            elif m.derived_feature.method_name.startswith('threshold_'):
+                v = getattr(DerivedFeatureMethods, m.derived_feature.method_name)(obs_df)
             else:
                 v = getattr(DerivedFeatureMethods, m.derived_feature.method_name)(obs_df)
 
@@ -278,73 +280,120 @@ class Environment:
         }
         return obs_ts, realized, done, info
     
-
+    
     def step_with_shorts(self, action: int):
-        """
-        Like `step`, but allows symmetric long/short behavior with a single-unit position.
-        Actions:
-            -1 = Sell
-            0 = Hold
-            1 = Buy
-
-        Position state after using this API:
-            -1 = short, 0 = flat, 1 = long
-
-        Rules:
-        - If flat (0):
-            BUY (1)  -> open LONG at current price
-            SELL (-1)-> open SHORT at current price
-        - If long (1):
-            SELL (-1)-> close LONG, realize PnL = price - entry
-            BUY (1)  -> HOLD (no pyramiding)
-        - If short (-1):
-            BUY (1)  -> close SHORT, realize PnL = entry - price
-            SELL (-1)-> HOLD (no pyramiding)
-        - HOLD (0) always keeps the current position.
-        """
         FEE_RATE = 0.0002
         TRADE_QTY = 1.0
-        price = float(self.data.iloc[self.current_step]['price'])
-        realized = 0.0
+        MIN_EDGE_BPS = float(getattr(runtime_settings, "SIM_MIN_EDGE_BPS", 0.0))
 
+        n = len(self.data)
+        if n == 0 or self.current_step >= n:
+            last_price = float(self.data.iloc[-1]['price']) if n > 0 else 0.0
+            info = {
+                "cash": self.cash,
+                "position": self.position,
+                "entry_price": float(self.entry_price) if self.entry_price is not None else 0.0,
+                "price": last_price,
+                "realized_pnl": 0.0,
+                "unrealized_pnl": 0.0,
+                "event": "terminal",
+                "entry_price_before": float(self.entry_price) if self.entry_price is not None else 0.0,
+                "entry_price_after": float(self.entry_price) if self.entry_price is not None else 0.0,
+            }
+            return None, 0.0, True, info
+
+        idx = self.current_step if self.current_step < n else n - 1
+        price = float(self.data.iloc[idx]['price'])
+        realized = 0.0
+        event = "hold"
+        entry_before = float(self.entry_price) if self.entry_price is not None else 0.0
+
+        # FAST PATH HOLD
+        if action == 0:
+            if self.position == 1 and self.entry_price is not None:
+                unreal = price - float(self.entry_price)
+            elif self.position == -1 and self.entry_price is not None:
+                unreal = float(self.entry_price) - price
+            else:
+                unreal = 0.0
+            self.current_step += 1
+            done = self.current_step >= n
+            info = {
+                "cash": self.cash,
+                "position": self.position,
+                "entry_price": float(self.entry_price) if self.entry_price is not None else 0.0,
+                "price": price,
+                "realized_pnl": 0.0,
+                "unrealized_pnl": unreal,
+                "event": event,
+                "entry_price_before": entry_before,
+                "entry_price_after": float(self.entry_price) if self.entry_price is not None else 0.0,
+            }
+            return None, 0.0, done, info
+
+        # OPEN EDGE GATE (opens only)
+        if self.position == 0 and action != 0 and MIN_EDGE_BPS > 0.0:
+            prev_idx = max(self.current_step - 1, 0)
+            prev_price = float(self.data.iloc[prev_idx]['price'])
+            move_bps = abs((price / (prev_price + 1e-12)) - 1.0) * 1e4
+            if move_bps < MIN_EDGE_BPS:
+                action = 0
+                if self.position == 1 and self.entry_price is not None:
+                    unreal = price - float(self.entry_price)
+                elif self.position == -1 and self.entry_price is not None:
+                    unreal = float(self.entry_price) - price
+                else:
+                    unreal = 0.0
+                self.current_step += 1
+                done = self.current_step >= n
+                info = {
+                    "cash": self.cash,
+                    "position": self.position,
+                    "entry_price": float(self.entry_price) if self.entry_price is not None else 0.0,
+                    "price": price,
+                    "realized_pnl": 0.0,
+                    "unrealized_pnl": unreal,
+                    "event": event,
+                    "entry_price_before": entry_before,
+                    "entry_price_after": float(self.entry_price) if self.entry_price is not None else 0.0,
+                }
+                return None, 0.0, done, info
+
+        # POSITION TRANSITIONS
         if action == 1:  # BUY
             if self.position == 0:
-                # open long
                 self.position = 1
                 self.entry_price = price
+                event = "open_long"
             elif self.position == -1:
-                # close short
-                fee_on_close = 2 * float(self.data.iloc[self.current_step]['price']) * TRADE_QTY * FEE_RATE
+                fee_on_close = 2 * price * TRADE_QTY * FEE_RATE
                 realized = (float(self.entry_price) - price) * TRADE_QTY - fee_on_close
                 self.cash += realized
                 self.position = 0
                 self.entry_price = None
-            # if already long -> hold (no pyramiding)
+                event = "close_short"
 
         elif action == -1:  # SELL
             if self.position == 0:
-                # open short
                 self.position = -1
                 self.entry_price = price
+                event = "open_short"
             elif self.position == 1:
-                # close long
-                fee_on_close = 2 * float(self.data.iloc[self.current_step]['price']) * TRADE_QTY * FEE_RATE
+                fee_on_close = 2 * price * TRADE_QTY * FEE_RATE
                 realized = (price - float(self.entry_price)) * TRADE_QTY - fee_on_close
                 self.cash += realized
                 self.position = 0
                 self.entry_price = None
-            # if already short -> hold (no pyramiding)
+                event = "close_long"
 
-        # action == 0 -> hold (do nothing)
-
-        # advance time
+        # advance
         self.current_step += 1
-        done = self.current_step >= len(self.data)
+        done = self.current_step >= n
 
-        # For back-compat, return only the time-series observation
+        # obs
         obs_ts = self._get_observation_ts_only() if not done else None
 
-        # unrealized PnL based on current position
+        # unrealized (based on price used)
         if self.position == 1 and self.entry_price is not None:
             unreal = price - float(self.entry_price)
         elif self.position == -1 and self.entry_price is not None:
@@ -354,11 +403,13 @@ class Environment:
 
         info = {
             "cash": self.cash,
-            "position": self.position,  # -1 short, 0 flat, 1 long
+            "position": self.position,
             "entry_price": float(self.entry_price) if self.entry_price is not None else 0.0,
             "price": price,
             "realized_pnl": realized,
             "unrealized_pnl": unreal,
+            "event": event,
+            "entry_price_before": entry_before,
+            "entry_price_after": float(self.entry_price) if self.entry_price is not None else 0.0,
         }
         return obs_ts, realized, done, info
-

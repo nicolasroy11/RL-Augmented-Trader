@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.optim as optim
 from django.db.models.query import QuerySet
 
-from services.core.dtos.policy_gradient_results_dto import EpisodeResultsDto, PolicyGradientResultsDto
+from services.core.dtos.policy_gradient_results_dto import EpisodeResultsDto, PPOTCNTrainingResults
 import numpy as np
 import torch
 from services.core.ML.configurations.PPO_flattened_history.environment import Environment
@@ -83,7 +83,7 @@ class RLRepository:
         self._run_ppo(num_episodes, gamma, clip_epsilon, ppo_epochs, batch_size)
         
 
-    def _run_ppo(self, num_episodes, gamma, clip_epsilon, ppo_epochs, batch_size) -> PolicyGradientResultsDto:
+    def _run_ppo(self, num_episodes, gamma, clip_epsilon, ppo_epochs, batch_size) -> PPOTCNTrainingResults:
         all_episode_metrics: List[EpisodeResultsDto] = []
 
         for episode_number in range(num_episodes):
@@ -198,7 +198,7 @@ class RLRepository:
             print(f"Episode {episode_number} finished. Final PnL: {final_pnl:.2f}, Buy-and-hold: {buy_and_hold_pnl:.2f}, Max Drawdown: {max_drawdown:.2f}, Sharpe: {sharpe_ratio:.2f}")
 
         json_log_training_progression(all_episode_metrics, f'PPO_flattened_{self.session.id}')
-        results = PolicyGradientResultsDto()
+        results = PPOTCNTrainingResults()
         results.episode_results = all_episode_metrics
         return results
     
@@ -236,42 +236,106 @@ class RLRepository:
 
         return chunks
 
+    def run_policy_gradient(
+        self,
+        window_size=150,
+        num_episodes=100,
+        gamma=0.95,
+        lr=1e-3,
+        test_split=0.2,
+        seed=42,
+    ) -> PPOTCNTrainingResults:
+        import math, random
+        torch.manual_seed(seed)
+        random.seed(seed)
+        np.random.seed(seed)
 
-    def run_policy_gradient(self, window_size=runtime_settings.DATA_TICKS_WINDOW_LENGTH, num_episodes=100, gamma=0.95, lr=1e-3) -> PolicyGradientResultsDto:
         queryset = TickData.objects.order_by('timestamp').all()
         data_chunks = self.get_valid_data_chunks(queryset, window_size=window_size, min_windows=10)
         if not data_chunks:
             raise ValueError("No valid chunks found with enough rows.")
-        
+
+        # ---- Train/Test split on CHUNKS ----
+        # data_chunks may be a dict-like (you iterate .values() below). Normalize to a list of DataFrames.
+        all_chunks = list(data_chunks.values()) if hasattr(data_chunks, "values") else list(data_chunks)
+        random.shuffle(all_chunks)
+        n_test = max(1, int(len(all_chunks) * test_split))
+        test_chunks = all_chunks[:n_test]
+        train_chunks = all_chunks[n_test:]
+
+        if len(train_chunks) == 0:
+            raise ValueError("Train split ended up empty; reduce test_split or provide more data.")
+
         feature_set = FeatureSet.objects.get(id=DEFAULT_FEATURE_SET_ID)
         input_dim = feature_set.get_feature_vector_size()
-
-        # dummy_env = StochasticSingleBuy(data_chunks[0], window_size=window_size)
-        # input_dim = dummy_env.normalized_reset().shape[0]
 
         policy = FeedForwardNN(input_dim)
         optimizer = optim.Adam(policy.parameters(), lr=lr)
 
         all_episode_metrics: List[EpisodeResultsDto] = []
 
+        # Track best model by test Final PnL (you can switch to Sharpe if you prefer)
+        best_test_score = -float("inf")
+        best_episode_index = -1
+        best_model_path = None
+
+        # ---------- helper: evaluation on a list of chunks (no grad, greedy) ----------
+        def evaluate_policy_on_chunks(policy, feature_set, chunks):
+            policy.eval()
+            ep_pnls = []
+            cumulative_pnl = 0.0
+            with torch.no_grad():
+                for chunk in chunks[:1:]:
+                    env = Environment(feature_set=feature_set, tick_df=chunk)
+                    state_np = env.normalized_reset()
+                    done = False
+                    while not done:
+                        state = torch.tensor(state_np, dtype=torch.float32).flatten().unsqueeze(0)
+                        probs = policy(state)
+                        action = torch.argmax(probs, dim=1)  # greedy for eval
+                        state_np, reward, done, info = env.step(action.item() - 1)
+                        cumulative_pnl += reward
+                        ep_pnls.append(cumulative_pnl)
+
+            ep_pnls_array = np.array(ep_pnls) if len(ep_pnls) > 0 else np.array([0.0])
+            running_max = np.maximum.accumulate(ep_pnls_array)
+            drawdowns = running_max - ep_pnls_array
+            max_drawdown = float(drawdowns.max()) if len(drawdowns) > 0 else 0.0
+            final_pnl = float(ep_pnls_array[-1]) if len(ep_pnls_array) > 0 else 0.0
+
+            # Buy-and-hold for the same set of chunks
+            buy_and_hold_pnl = float(sum(c.iloc[-1]['price'] - c.iloc[0]['price'] for c in chunks))
+
+            step_returns = np.diff(ep_pnls_array)
+            sharpe_ratio = (
+                (step_returns.mean() / (step_returns.std() + 1e-9)) * np.sqrt(252)
+                if len(step_returns) > 0 else 0.0
+            )
+            policy.train()
+            return {
+                "final_pnl": final_pnl,
+                "buy_and_hold_pnl": buy_and_hold_pnl,
+                "max_drawdown": max_drawdown,
+                "sharpe_ratio": float(sharpe_ratio),
+            }
+
         for episode_number in range(num_episodes):
             print(f"\n=== Starting Episode {episode_number} ===")
-            random.shuffle(data_chunks)
 
             log_probs = []
             rewards = []
             cumulative_pnl = 0.0
             episode_pnls = []
 
-            for chunk in data_chunks:
-                env = Environment(feature_set=feature_set, tick_df=chunk)
+            # -------- TRAIN LOOP (sample actions) --------
+            for chunk in train_chunks:
+                env = Environment(feature_set=feature_set, tick_df=chunk[:200])
                 current_env_state = env.normalized_reset()
                 done = False
 
                 chunk_log_probs = []
                 chunk_rewards = []
 
-                # STEP LOOP
                 while not done:
                     state = torch.tensor(current_env_state, dtype=torch.float32).flatten().unsqueeze(0)
                     action_probabilities = policy(state)
@@ -293,7 +357,6 @@ class RLRepository:
                         f'\tepisode # {episode_number}'
                     )
 
-
                 # Normalize chunk rewards
                 chunk_rewards = torch.tensor(chunk_rewards, dtype=torch.float32)
                 if chunk_rewards.std() > 0:
@@ -302,9 +365,10 @@ class RLRepository:
                 rewards.extend(chunk_rewards.tolist())
                 log_probs.extend(chunk_log_probs)
 
+            # -------- Policy gradient update --------
             # Compute discounted returns
             returns = []
-            R = 0
+            R = 0.0
             for r in reversed(rewards):
                 R = r + gamma * R
                 returns.insert(0, R)
@@ -312,29 +376,29 @@ class RLRepository:
             if returns.std() > 0:
                 returns = (returns - returns.mean()) / (returns.std() + 1e-9)
 
-            # Policy gradient update
-            loss = 0
-            for log_prob, R in zip(log_probs, returns):
-                loss -= log_prob * R
+            loss = 0.0
+            for log_prob, Rt in zip(log_probs, returns):
+                loss -= log_prob * Rt
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            # --- EPISODE-LEVEL METRICS ---
+            # --- EPISODE-LEVEL TRAIN METRICS ---
             episode_pnls_array = np.array(episode_pnls)
+            running_max = np.maximum.accumulate(episode_pnls_array) if len(episode_pnls_array) else np.array([0.0])
+            drawdowns = running_max - episode_pnls_array if len(episode_pnls_array) else np.array([0.0])
+            max_drawdown = float(drawdowns.max()) if len(drawdowns) > 0 else 0.0
+            final_pnl = float(episode_pnls_array[-1]) if len(episode_pnls_array) > 0 else 0.0
 
-            running_max = np.maximum.accumulate(episode_pnls_array)
-            drawdowns = running_max - episode_pnls_array
-            max_drawdown = drawdowns.max() if len(drawdowns) > 0 else 0.0
-
-            final_pnl = episode_pnls_array[-1] if len(episode_pnls_array) > 0 else 0.0
-
-            # Buy-and-hold cumulative PnL
-            buy_and_hold_pnl = sum(chunk.iloc[-1]['price'] - chunk.iloc[0]['price'] for chunk in data_chunks)
+            # Buy-and-hold cumulative PnL (TRAIN SET)
+            buy_and_hold_pnl = float(sum(chunk.iloc[-1]['price'] - chunk.iloc[0]['price'] for chunk in train_chunks))
 
             # Sharpe ratio (assuming step-level returns)
             step_returns = np.diff(episode_pnls_array)
-            sharpe_ratio = (step_returns.mean() / (step_returns.std() + 1e-9)) * np.sqrt(252) if len(step_returns) > 0 else 0.0
+            sharpe_ratio = (
+                (step_returns.mean() / (step_returns.std() + 1e-9)) * np.sqrt(252)
+                if len(step_returns) > 0 else 0.0
+            )
 
             episode_metrics = EpisodeResultsDto()
             episode_metrics.episode_number = episode_number
@@ -344,18 +408,53 @@ class RLRepository:
             episode_metrics.drawdowns = drawdowns.tolist()
             episode_metrics.max_drawdown = max_drawdown
             episode_metrics.buy_and_hold_pnl = buy_and_hold_pnl
-            episode_metrics.sharpe_ratio = sharpe_ratio
+            episode_metrics.sharpe_ratio = float(sharpe_ratio)
+
+            # ---- TEST EVAL for current policy ----
+            test_eval = evaluate_policy_on_chunks(policy, feature_set, test_chunks)
+            # attach test metrics (adds attrs dynamically)
+            episode_metrics.validation_pnl = test_eval["final_pnl"]
+            episode_metrics.buy_and_hold_pnl = test_eval["buy_and_hold_pnl"]
+            episode_metrics.max_drawdown = test_eval["max_drawdown"]
+            episode_metrics.sharpe_ratio = test_eval["sharpe_ratio"]
+
+            # Track best-by-test Final PnL (swap to Sharpe by changing the key)
+            current_test_score = test_eval["final_pnl"]
+            if current_test_score > best_test_score:
+                best_test_score = current_test_score
+                best_episode_index = episode_number
+                best_model_path = f"pth_files/trained_policy_gradient_best_on_test.pth"
+                torch.save(policy.state_dict(), best_model_path)
+                print(f"** New best test score ({best_test_score:.4f}) at episode {episode_number}. Saved to {best_model_path}")
 
             all_episode_metrics.append(episode_metrics)
 
+            # Save current episode model as before
             model_path = f"pth_files/trained_policy_gradient_{episode_number}_.pth"
             torch.save(policy.state_dict(), model_path)
-            print(f"Trained policy saved to {model_path}")
+            print(
+                f"Episode {episode_number} finished. "
+                f"[TRAIN] Final PnL: {final_pnl:.2f}, B&H: {buy_and_hold_pnl:.2f}, "
+                f"MaxDD: {max_drawdown:.2f}, Sharpe: {sharpe_ratio:.2f} | "
+                f"[TEST] Final PnL: {test_eval['final_pnl']:.2f}, "
+                f"B&H: {test_eval['buy_and_hold_pnl']:.2f}, "
+                f"MaxDD: {test_eval['max_drawdown']:.2f}, "
+                f"Sharpe: {test_eval['sharpe_ratio']:.2f}"
+            )
 
-            print(f"Episode {episode_number} finished. Final PnL: {final_pnl:.2f}, Buy-and-hold: {buy_and_hold_pnl:.2f}, Max Drawdown: {max_drawdown:.2f}, Sharpe: {sharpe_ratio:.2f}")
+        # Final summary
+        print(f"Best test episode: {best_episode_index} with test Final PnL = {best_test_score:.4f}")
+        if best_model_path:
+            print(f"Best-on-test policy saved to {best_model_path}")
 
-        results = PolicyGradientResultsDto()
+        results = PPOTCNTrainingResults()
         results.episode_results = all_episode_metrics
+        # Optional: expose which episode was best on test
+        # try:
+        #     results.best_test_episode = best_episode_index
+        #     results.best_test_metric = best_test_score
+        #     results.best_model_path = best_model_path
+        # except Exception:
+        #     pass
 
         return results
-    

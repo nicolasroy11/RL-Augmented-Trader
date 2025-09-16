@@ -30,6 +30,20 @@ class Ticks:
             data_repo.start_data_collection()
             return JsonResponse(data="Data collection started", safe=False)
         return exec()
+    
+    @View(
+        path='start_futures_data_collection',
+        http_method='POST',
+        return_type=TickDto.Serializer(many=True),
+        description='Get all ticks'
+    )
+    @csrf_exempt
+    def start_futures_data_collection(req: WSGIRequest):
+        def exec():
+            data_repo = DataRepository(feature_set_name='tcn 5min observation set', is_futures=True)
+            data_repo.start_data_collection()
+            return JsonResponse(data="Data collection started", safe=False)
+        return exec()
 
     @View(
         path='get_all_ticks',

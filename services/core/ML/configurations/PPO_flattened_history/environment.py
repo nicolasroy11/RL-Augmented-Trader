@@ -19,7 +19,6 @@ class Environment:
         self.cash = initial_cash
         self.feature_set = feature_set
         self.feature_set_flat_vector_size = feature_set.get_feature_vector_size()
-        self.load_inference_policy()
         # if not tick_df and not tick_list:
         #     raise ValueError('need to pass in at tick_df or tick_list!')
         self.window_size = runtime_settings.DATA_TICKS_WINDOW_LENGTH
@@ -29,6 +28,7 @@ class Environment:
         self.current_step = 0
         self.position: int = 0
         self.entry_price: float = None
+        self.inference_policy_loaded = False
 
 
     def get_ordered_ticks(self):
@@ -60,6 +60,9 @@ class Environment:
             for m in derived_feature_mappings:
                 if m.derived_feature.method_name.startswith('position_'):
                     value = getattr(DerivedFeatureMethods, m.derived_feature.method_name)(position, entry_price, price)
+                    derived_features[m.derived_feature.method_name] = value
+                elif m.derived_feature.method_name.startswith('threshold_'):
+                    value = getattr(DerivedFeatureMethods, m.derived_feature.method_name)(obs_df)
                     derived_features[m.derived_feature.method_name] = value
                 else:
                     value = getattr(DerivedFeatureMethods, m.derived_feature.method_name)(obs_df)
@@ -104,6 +107,7 @@ class Environment:
         
 
     def load_inference_policy(self):
+        if not self.inference_policy_loaded: self.load_inference_policy()
         input_dim = self.feature_set_flat_vector_size
         action_dim = 3  # sell, hold, buy
         self.policy_device = torch.device("cpu")

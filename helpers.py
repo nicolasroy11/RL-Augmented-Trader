@@ -30,6 +30,15 @@ def get_latest_candles(client: Client, symbol: str, num_of_candles_back: int, ca
     return temp_df
 
 
+def get_latest_futures_candles(client: Client, symbol: str, candle_interval: str, num_of_candles_back: int = 1500):
+    klines = client.futures_klines(symbol=symbol, interval=candle_interval, limit=num_of_candles_back)
+    ohlcv_array = [np.float_(a[0:7]) for a in klines]
+    temp_df = pd.DataFrame(ohlcv_array, columns = ['Time', 'Open', 'High', 'Low', 'Close', 'Volume', 'CloseTime'])
+    temp_df['Datetime'] = [datetime.fromtimestamp(float(time)/1000) for time in temp_df['Time']]
+    temp_df.set_index('Datetime', inplace=True)
+    return temp_df
+
+
 def get_latest_closed_candles(client: Client, symbol: str, candle_interval: str, num_of_candles_back: int=None, start_datetime: datetime=None, end_datetime: datetime=None) -> pd.DataFrame:
     if start_datetime and end_datetime:
         klines = client.get_historical_klines(symbol=symbol, interval=candle_interval, start_str=int(start_datetime.timestamp())*1000, end_str=int(end_datetime.timestamp())*1000)

@@ -11,14 +11,6 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
-from db.data_store import DataStore
-import db.settings as db_settings
-
-
-# DUCKDB_FILE_PATH = db_settings.DUCKDB_ARCHIVES_PATH + '/08122025_large_ticks.duckdb'
-
-# READ_ONLY_DUCKDB_CONN = DataStore(db_path=DUCKDB_FILE_PATH, readonly=True)
-# WRITE_DUCKDB_CONN = DataStore(db_path=DUCKDB_FILE_PATH, readonly=False)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

@@ -32,6 +32,7 @@ from sklearn.metrics import balanced_accuracy_score
 
 from django.conf import settings
 
+import runtime_settings
 from services.core.models import (
     TickData,
     TrainingFields,
@@ -827,9 +828,9 @@ def train_test_walk_forward_on_futures(
     # Persist best model to MLModel and dump JSON artifact
     ml_model_record = MLModel.objects.create(feature_set=feature_set, run_configuration=ts.run_configuration)
 
-    model_directory = getattr(settings, "ML_MODELS_DIR", os.path.join(settings.BASE_DIR, "models"))
+    model_directory = os.path.join(runtime_settings.MODELS_PATH, 'xgboost', ml_model_record.id) # runtime_settings.MODELS_PATH + f"/xgboost/{ml_model_record.id}"
     os.makedirs(model_directory, exist_ok=True)
-    model_path = os.path.join(model_directory, f"{ml_model_record.id}.json")
+    model_path = os.path.join(model_directory, "model.json")
 
     if best_model is None:
         raise RuntimeError("Training produced no valid model.")
@@ -848,9 +849,7 @@ def train_test_walk_forward_on_futures(
     Hyperparameter.objects.create(ml_model=ml_model_record, key="selection_value", value=str(best_test_sharpe))
 
     # JSON artifact
-    artifact_dir = os.path.join(model_directory, "artifacts")
-    os.makedirs(artifact_dir, exist_ok=True)
-    artifact_path = os.path.join(artifact_dir, artifact_name if artifact_name.endswith(".json") else artifact_name + ".json")
+    artifact_path = model_directory + '/training_artifacts.json'
 
     artifact = {
         "meta": {
